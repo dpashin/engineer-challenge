@@ -32,7 +32,8 @@ UI-дизайн (https://www.figma.com/design/31KetUbya482vMSGgyiNIf/Orbitto-%7C
 1. Архитектура
 - [ ] Покажите доменную модель и границы контекстов.
 - [ ] Выделите command side и query side (даже если в упрощенном виде).
-- [ ] Опишите ключевые инварианты и бизнес-правила (например, правила reset-token, валидация пароля, ограничения на повторную отправку).
+- [x] Опишите ключевые инварианты и бизнес-правила (например, правила reset-token, валидация пароля, ограничения на повторную отправку).
+> [здесь](#бизнес-правила-и-ключевые-инварианты) 
 
 2. API/протокол взаимодействия
 - [x] Предпочтительный уровень: `gRPC` и/или `GraphQL`.
@@ -252,35 +253,39 @@ docker-compose ps
 
 ## Бизнес-правила и ключевые инварианты
 
-### Регистрация
-- [Sequence diagram](./doc/sequence-diagrams-registration.mmd)
+### Бизнес-процессы
+- [Регистрация](./doc/sequence-diagrams-registration.mmd)
+- [Аутентификация](./doc/sequence-diagrams-login.mmd)
+- [Восстановление пароля](./doc/sequence-diagrams-recovery.mmd)
 
-#### Валидация пароля
+### Токены
+
+#### Access Token
+- Algorithm: JWT with HMAC SHA-256
+- Expiration: JWT_ACCESS_EXPIRES_IN = 3600 seconds (1 hour)
+- Configurable via: .env variable JWT_ACCESS_EXPIRES_IN
+- Payload: Contains sub (userId), email, iat (issued at), exp (expiration)
+
+#### Refresh Token
+- Algorithm: JWT with HMAC SHA-256
+- Expiration: JWT_REFRESH_EXPIRES_IN = 604800 seconds (7 days)
+- Configurable via: .env variable JWT_REFRESH_EXPIRES_IN
+- Storage: Stored in database (refresh_tokens table) with expires_at column
+- Features: Supports revocation (single logout or all tokens)
+
+#### Password Reset Token
+- Expiration: 10 minutes (hardcoded in ResetTokenPolicyService)
+- Single-use: Token invalidated after use
+- Rate limiting: Max 3 attempts per 30 minute
+
+#### Пароль
 1. Минимальная длина: 8 символов.
 2. Разнообразие символов: Требование использовать минимум по одному символу из разных групп:
 - Заглавные буквы (A-Z).
 - Строчные буквы (a-z).
 - Цифры (0-9).
 - Специальные символы (!, @, #, $, % и др.).
-
-#### Хранение пароля
-В базе следует хранить не сам пароль, а его хэш.
-
-### Логин
-- [Sequence diagram](./doc/sequence-diagrams-login.mmd)
-
-### Восстановление пароля
-- [Sequence diagram](./doc/sequence-diagrams-recovery.mmd)
-
-- Срок действия (Expiration): 10 минут
-- Одноразовость (Single-use)
-- Аннулирование после использования: Сразу после успешной смены пароля токен должен быть немедленно удален или помечен как недействительный.
-- Аннулирование при новом запросе: Если пользователь запрашивает сброс пароля повторно, все предыдущие токены для этого аккаунта должны быть отозваны. 
-
-#### Криптографические требования
-- Случайность: Токен должен генерироваться с помощью криптографически стойкого генератора псевдослучайных чисел (CSPRNG). Нельзя использовать обычные функции типа rand().
-- Длина и энтропия: Минимум 128 бит энтропии (обычно это строка от 22 до 32+ символов в формате Base64 или URL-safe).
-- Хеширование в БД: В базе данных следует хранить не сам токен, а его хеш (например, SHA-256).
+3. В базе следует хранить не сам пароль, а его хэш.
 
 ### Rate limiting
 
@@ -303,8 +308,7 @@ Rate limiting реализован с использованием **Redis** и 
 - password_reset_tokens
 - refresh_tokens
 
-Поддержка горизонтального масштабирования.
-Если бэкэнд развернут на нескольких инстансах, не должно возникать конфликтов в крон-задачах.
+Поддержка горизонтального масштабирования (Если бэкэнд развернут на нескольких инстансах, не должно возникать конфликтов в крон-задачах).
 
 ## TODO
 
