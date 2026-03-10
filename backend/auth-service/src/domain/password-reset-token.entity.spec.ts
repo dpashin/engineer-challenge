@@ -1,4 +1,4 @@
-import { PasswordResetToken } from '../domain/password-reset-token.entity';
+import { PasswordResetToken } from './password-reset-token.entity';
 
 describe('PasswordResetToken', () => {
   const createToken = (overrides?: Partial<ReturnType<typeof PasswordResetToken.prototype.toProps>>) => {
