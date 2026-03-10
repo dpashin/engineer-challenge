@@ -194,12 +194,29 @@ engineer-challenge/
 
 ## Быстрый старт
 
+### Генерация безопасных секретов
+
+**Важно:** Перед запуском необходимо сгенерировать криптографически стойкие секреты!
+
+```bash
+# Автоматическая генерация всех секретов
+./scripts/generate-secrets.sh
+
+# Или вручную для каждого секрета:
+openssl rand -base64 32  # JWT_ACCESS_SECRET
+openssl rand -base64 32  # JWT_REFRESH_SECRET
+openssl rand -base64 32 | tr -dc 'a-zA-Z0-9' | head -c 32  # DB_PASSWORD
+```
+
 ### Запуск всего приложения
 
 ```bash
 # Клонировать репозиторий
 git clone -b dev git@github.com:dpashin/engineer-challenge.git
 cd engineer-challenge
+
+# Сгенерировать секреты (если ещё не сделали)
+./scripts/generate-secrets.sh
 
 # Запустить все сервисы
 docker-compose up -d --build
@@ -232,11 +249,11 @@ docker build --target dev -t auth-service-dev ./backend/auth-service && docker r
 Для production окружения используйте отдельный compose файл с hardened настройками:
 
 ```bash
-# 1. Скопируйте .env.example и заполните переменные
-cp .env.example .env
+# 1. Сгенерируйте безопасные секреты (если ещё не сделали)
+./scripts/generate-secrets.sh
 
-# 2. Заполните .env реальными значениями (особенно секреты!)
-# Сгенерируйте JWT секреты: openssl rand -base64 32
+# 2. Проверьте .env файл и настройте SMTP для production
+# Отредактируйте SMTP_HOST, SMTP_USER, SMTP_PASSWORD для реального почтового сервера
 
 # 3. Запустите production стек
 docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
@@ -252,6 +269,15 @@ docker-compose ps
 - Health checks для всех сервисов
 - `restart: always` для авто-восстановления
 - Нет hardcoded secrets в docker-compose файлах
+
+### Безопасность
+
+**Критические требования:**
+- ✅ Никогда не коммитьте `.env` файл в git (добавлен в `.gitignore`)
+- ✅ Генерируйте уникальные секреты для каждого развёртывания
+- ✅ Используйте HTTPS в production (настройте reverse proxy с SSL)
+- ✅ Регулярно обновляйте зависимости (`npm audit`, `npm audit fix`)
+- ✅ Ротируйте секреты периодически (минимум раз в 90 дней)
 
 ## Бизнес-правила и ключевые инварианты
 
@@ -325,7 +351,9 @@ Rate limiting реализован с использованием **Redis** и 
 - [ ] Метрики (prometheus), трейсинг (подумать)
 - [ ] подумать на предмет замены localstorage на куки
 - [ ] еще раз прочекать twelve-factor, что-то оставалось
-- [ ] прочекать на уязвимости
+- [x] прочекать на уязвимости
+- [x] Исправить уязвимости в зависимостях (nodemailer, bcrypt)
+- [x] Удалить hardcoded секреты из docker-compose.yml
 - [ ] Посчитать покрытие юнит-тестами
 - [ ] Логин - валидация пароля сообщение на английском
 - [ ] Проверить, как бэк отдает health статус
