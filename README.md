@@ -48,11 +48,15 @@ UI-дизайн (https://www.figma.com/design/31KetUbya482vMSGgyiNIf/Orbitto-%7C
 4. Безопасность
 - [x] Без хранения паролей в открытом виде.
 - [x] Корректная работа с токенами/сессиями.
-- [ ] Защита базовых auth-флоу (rate limiting, expiration, replay/abuse considerations).
+- [ ] Защита базовых auth-флоу
+    - [x] rate limiting
+    > [здесь](#rate-limiting)
+    - [ ] expiration
+    - [ ] replay/abuse considerations
 
 5. Наблюдаемость и качество
 - [x] Логи, метрики или трейсинг (минимум один из блоков).
-Логи добавлены, метрики и tracing запланированы в [todo](#todo)
+> Логи добавлены, метрики и tracing запланированы в [todo](#todo)
 - [x] Тесты критичных участков (доменные правила, auth-флоу, интеграционные точки).
 > см. [Запуск тестов](#запуск-тестов)
 
@@ -280,7 +284,9 @@ docker-compose ps
 
 ### Rate limiting
 
-Rate limiting реализован с использованием **Redis** и алгоритма **Sliding Window Log**:
+Rate limiting реализован с использованием **Redis** и алгоритма **Sliding Window Log**.
+
+см. [ADR](./doc/adr/0008-rate-limiting.md)
 
 - **LOGIN_BY_EMAIL** — ограничение неудачных попыток входа по email
 - **LOGIN_BY_IP** — ограничение по IP адресу
