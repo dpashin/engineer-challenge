@@ -6,39 +6,104 @@ sequenceDiagram
     participant Frontend as Frontend
     participant API as GraphQL API
     participant Command as Command Side
-    participant Domain as Domain Model
-    participant DB as PostgreSQL
+    participant RateLimit as Rate Limit Service
+    participant Redis as Redis
+    participant UserRepo as User Repository
+    participant PasswordHasher as Password Hasher
+    participant TokenService as Token Service
+    participant RefreshTokenRepo as Refresh Token Repository
 
-    User->>Frontend: Enter credentials
+    User->>Frontend: Enter credentials (email, password)
     Frontend->>API: POST /graphql (LoginMutation)
     API->>Command: Handle LoginCommand
-    Command->>Domain: Find User by Email
-    Domain->>DB: Query user
-    alt User not found
-        DB-->>Domain: No user found
-        Domain-->>Command: UserNotFoundError
-        Command-->>API: Invalid credentials
+
+    %% Rate Limit Check by Email
+    Command->>RateLimit: Check Rate Limit (by email)
+    RateLimit->>Redis: Check failed attempts (sliding window)
+    Redis-->>RateLimit: Count > limit
+    alt Rate limit exceeded (email)
+        RateLimit-->>Command: ACCOUNT_LOCKED + retryAfter
+        Command-->>API: LoginError.ACCOUNT_LOCKED
         API-->>Frontend: Error message
-        Frontend-->>User: Login failed
-    else User found
-        DB-->>Domain: User data
-        Command->>Domain: Verify Password Hash
-        Domain->>Domain: CompareHash(password, storedHash)
-        alt Invalid password
-            Domain-->>Command: InvalidPasswordError
-            Command-->>API: Invalid credentials
+        Frontend-->>User: Account locked (try later)
+    else Rate limit OK
+        RateLimit-->>Command: Allowed
+
+        %% Rate Limit Check by IP
+        Command->>RateLimit: Check Rate Limit (by IP)
+        RateLimit->>Redis: Check IP requests
+        Redis-->>RateLimit: Count > limit
+        alt Rate limit exceeded (IP)
+            RateLimit-->>Command: TOO_MANY_REQUESTS + retryAfter
+            Command-->>API: LoginError.TOO_MANY_REQUESTS
             API-->>Frontend: Error message
-            Frontend-->>User: Login failed
-        else Valid password
-            Domain-->>Command: Password verified
-            Command->>Domain: Check Rate Limit
-            Domain->>DB: Check failed attempts
-            DB-->>Domain: Attempts OK
-            Command->>DB: Generate JWT Token
-            Command->>DB: Reset failed attempts counter
-            DB-->>Command: Token generated
-            Command-->>API: LoginResult and JWT
-            API-->>Frontend: Success and JWT
-            Frontend-->>User: Login successful
+            Frontend-->>User: Too many requests
+        else Rate limit OK
+            RateLimit-->>Command: Allowed
+
+            %% Find User
+            Command->>UserRepo: Find by Email
+            UserRepo->>Redis: Query user
+            Redis-->>UserRepo: No user found
+            alt User not found
+                UserRepo-->>Command: null
+                Command-->>API: LoginError.USER_NOT_FOUND
+                API-->>Frontend: Error message
+                Frontend-->>User: Login failed
+            else User found
+                Redis-->>UserRepo: User data (id, passwordHash, isActive)
+                UserRepo-->>Command: User entity
+
+                %% Check Account Status
+                alt Account is locked (!isActive)
+                    Command-->>API: LoginError.ACCOUNT_LOCKED
+                    API-->>Frontend: Error message
+                    Frontend-->>User: Account locked
+                else Account is active
+                    %% Verify Password
+                    Command->>PasswordHasher: Compare(password, passwordHash)
+                    PasswordHasher-->>Command: false
+                    alt Invalid password
+                        PasswordHasher-->>Command: InvalidPasswordError
+                        Command->>UserRepo: Record Failed Login
+                        UserRepo->>Redis: Increment failed attempts
+                        Redis-->>UserRepo: Recorded
+                        UserRepo-->>Command: Done
+                        Command-->>API: LoginError.INVALID_PASSWORD
+                        API-->>Frontend: Error message
+                        Frontend-->>User: Invalid credentials
+                    else Valid password
+                        PasswordHasher-->>Command: Password verified
+                        Command->>UserRepo: Reset Failed Logins
+                        UserRepo->>Redis: Clear failed attempts
+                        Redis-->>UserRepo: Reset done
+                        UserRepo-->>Command: Done
+
+                        %% Generate Tokens
+                        Command->>TokenService: Generate Access Token
+                        TokenService-->>Command: JWT accessToken
+                        Command->>TokenService: Generate Refresh Token
+                        TokenService-->>Command: refreshToken + expiresAt
+                        Command->>TokenService: Hash Refresh Token
+                        TokenService-->>Command: refreshTokenHash
+
+                        %% Save Refresh Token
+                        Command->>RefreshTokenRepo: Create(userId, hash, expiresAt, ip, userAgent)
+                        RefreshTokenRepo->>Redis: Store refresh token
+                        Redis-->>RefreshTokenRepo: Stored
+                        RefreshTokenRepo-->>Command: Done
+
+                        Command-->>API: LoginResult { accessToken, refreshToken, expiresIn }
+                        API-->>Frontend: Success + JWT tokens
+                        Frontend-->>User: Login successful
+                    end
+                end
+            end
         end
     end
+
+    %% Error Handling
+    note over Command: catch (error)
+    Command-->>API: LoginError.INTERNAL_ERROR
+    API-->>Frontend: Error message
+    Frontend-->>User: Login failed
