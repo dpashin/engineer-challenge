@@ -124,6 +124,12 @@ UI-дизайн (https://www.figma.com/design/31KetUbya482vMSGgyiNIf/Orbitto-%7C
 
 # Реализация
 
+## Архитектура
+
+[System context diagram](./doc/system-context.mmd)
+
+[Записи архитектурных решений](./doc/adr/)
+
 ## Технологии
 
 ### Backend
@@ -235,7 +241,13 @@ docker-compose ps
 - `restart: always` для авто-восстановления
 - Нет hardcoded secrets в docker-compose файлах
 
-## Ключевые инварианты и бизнес-правила
+## Бизнес-правила и ключевые инварианты
+
+### Диаграммы последовательностей
+- [Регистрация](./doc/sequence-diagrams-registration.mmd)
+- [Логин](./doc/sequence-diagrams-login.mmd)
+- [Восстановления пароля](./doc/sequence-diagrams-recovery.mmd)
+
 
 ### Правила reset-token
 1. Срок действия (Expiration): 10 минут
