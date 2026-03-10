@@ -17,6 +17,7 @@ stateDiagram-v2
         state "Command Side\n(команды: регистрация,\nавторизация, восстановление)" as CommandSide
         state "Query Side\n(запросы: чтение данных)" as QuerySide
         state "Domain Model\n(бизнес-правила,\nинварианты, агрегаты)" as DomainModel
+        state "Rate Limit Service\n(sliding window log)" as RateLimit
     }
 
     %% PostgreSQL
@@ -24,12 +25,18 @@ stateDiagram-v2
         state "Таблицы:\nпользователи,\nтокены" as Tables
     }
 
+    %% Redis
+    state "Redis\n(rate limiting,\nsliding window log)" as Redis
+
     %% Связи
     User --> Frontend: "Вводит данные\n(логин, пароль, email)"
     Frontend --> Backend
-    
+
     CommandSide --> DomainModel: "Применяет\nбизнес-правила"
     QuerySide --> DomainModel: "Читает\nданные"
 
     CommandSide --> Database: "Запись/обновление\n(пароли хешированы,\ntoken expiration)"
     QuerySide --> Database: "Чтение данных"
+    
+    RateLimit --> Redis: "Проверка лимитов\n(sliding window)"
+    Redis --> RateLimit: "allowed/remaining\nretryAfter"
