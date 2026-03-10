@@ -52,8 +52,10 @@ UI-дизайн (https://www.figma.com/design/31KetUbya482vMSGgyiNIf/Orbitto-%7C
 - [ ] Защита базовых auth-флоу
     - [x] rate limiting
     > [здесь](#rate-limiting)
-    - [ ] expiration
+    - [x] expiration
+    > [здесь](#токены)
     - [ ] replay/abuse considerations
+    > [здесь](#токены)
 
 5. Наблюдаемость и качество
 - [x] Логи, метрики или трейсинг (минимум один из блоков).
@@ -272,6 +274,12 @@ docker-compose ps
 - Configurable via: .env variable JWT_REFRESH_EXPIRES_IN
 - Storage: Stored in database (refresh_tokens table) with expires_at column
 - Features: Supports revocation (single logout or all tokens)
+- **Replay Attack Protection**:
+  - Each token contains unique `jti` (JWT ID) claim for identification
+  - Atomic token rotation: old token revoked BEFORE new tokens generated
+  - Database constraint: UNIQUE INDEX on `jti` prevents duplicate usage
+  - Fingerprint validation: IP address and User Agent are compared with original session
+  - Concurrent request handling: Second simultaneous request is rejected as replay attack
 
 #### Password Reset Token
 - Expiration: 10 minutes (hardcoded in ResetTokenPolicyService)
@@ -312,11 +320,12 @@ Rate limiting реализован с использованием **Redis** и 
 
 ## TODO
 
+- [ ] красивые миграции в базе (dbmate?, ...)
 - [ ] Terraform/Kubernetes manifests/Helm
 - [ ] Метрики (prometheus), трейсинг (подумать)
-- [ ] красивые миграции в базе (dbmate, ...)
 - [ ] подумать на предмет замены localstorage на куки
 - [ ] еще раз прочекать twelve-factor, что-то оставалось
+- [ ] прочекать на уязвимости
 - [ ] Посчитать покрытие юнит-тестами
 - [ ] Логин - валидация пароля сообщение на английском
 - [ ] Проверить, как бэк отдает health статус

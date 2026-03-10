@@ -75,6 +75,9 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
     -- Token hash (store hash, not raw token)
     token_hash VARCHAR(255) NOT NULL,
 
+    -- JWT ID (unique token identifier for replay attack prevention)
+    jti VARCHAR(255) NOT NULL,
+
     -- Session metadata
     ip_address INET,
     user_agent TEXT,
@@ -88,12 +91,14 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
     last_used_at TIMESTAMP WITH TIME ZONE,
 
     -- Constraints
-    CONSTRAINT refresh_tokens_token_hash_not_empty CHECK (token_hash <> '')
+    CONSTRAINT refresh_tokens_token_hash_not_empty CHECK (token_hash <> ''),
+    CONSTRAINT refresh_tokens_jti_not_empty CHECK (jti <> '')
 );
 
 -- Index for active refresh tokens
 CREATE INDEX idx_refresh_tokens_user ON refresh_tokens (user_id) WHERE revoked_at IS NULL;
 CREATE INDEX idx_refresh_tokens_expires ON refresh_tokens (expires_at);
+CREATE UNIQUE INDEX idx_refresh_tokens_jti ON refresh_tokens (jti) WHERE revoked_at IS NULL;
 
 -- ============================================
 -- Grant permissions to auth user

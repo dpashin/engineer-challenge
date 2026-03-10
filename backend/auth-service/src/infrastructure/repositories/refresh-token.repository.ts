@@ -11,12 +11,15 @@ export class RefreshTokenRepository {
     id: string;
     userId: string;
     tokenHash: string;
+    jti: string;
     expiresAt: Date;
     revokedAt: Date | null;
     lastUsedAt: Date | null;
+    ipAddress: string | null;
+    userAgent: string | null;
   } | null> {
     const rows = await this.db.query(
-      `SELECT id, user_id, token_hash, expires_at, revoked_at, last_used_at
+      `SELECT id, user_id, token_hash, jti, expires_at, revoked_at, last_used_at, ip_address, user_agent
        FROM refresh_tokens
        WHERE token_hash = $1
          AND revoked_at IS NULL`,
@@ -32,24 +35,45 @@ export class RefreshTokenRepository {
       id: row.id,
       userId: row.user_id,
       tokenHash: row.token_hash,
+      jti: row.jti,
       expiresAt: row.expires_at,
       revokedAt: row.revoked_at,
       lastUsedAt: row.last_used_at,
+      ipAddress: row.ip_address,
+      userAgent: row.user_agent,
     };
   }
 
   async create(
     userId: string,
     tokenHash: string,
+    jti: string,
     expiresAt: Date,
     ipAddress?: string,
     userAgent?: string,
   ): Promise<void> {
     await this.db.query(
-      `INSERT INTO refresh_tokens (user_id, token_hash, expires_at, ip_address, user_agent)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [userId, tokenHash, expiresAt, ipAddress || null, userAgent || null],
+      `INSERT INTO refresh_tokens (user_id, token_hash, jti, expires_at, ip_address, user_agent)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [userId, tokenHash, jti, expiresAt, ipAddress || null, userAgent || null],
     );
+  }
+
+  /**
+   * Atomically revoke a refresh token if it hasn't been revoked yet
+   * Returns true if successfully revoked, false if already revoked
+   */
+  async revokeAtomically(tokenId: string): Promise<boolean> {
+    const result = await this.db.query(
+      `UPDATE refresh_tokens
+       SET revoked_at = NOW()
+       WHERE id = $1
+         AND revoked_at IS NULL
+       RETURNING id`,
+      [tokenId],
+    );
+
+    return result.length > 0;
   }
 
   async revoke(tokenId: string): Promise<void> {
@@ -82,7 +106,7 @@ export class RefreshTokenRepository {
 
   async recordUsage(tokenId: string): Promise<void> {
     await this.db.query(
-      `UPDATE refresh_tokens 
+      `UPDATE refresh_tokens
        SET last_used_at = NOW()
        WHERE id = $1`,
       [tokenId],

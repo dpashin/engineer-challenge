@@ -26,7 +26,7 @@ export class RefreshTokenHandler implements ICommandHandler<RefreshTokenCommand,
     try {
       // Verify the refresh token
       const payload = await this.tokenService.verifyRefreshToken(refreshToken);
-      
+
       if (!payload) {
         this.logger.warn(`Invalid refresh token provided`);
         return {
@@ -36,13 +36,14 @@ export class RefreshTokenHandler implements ICommandHandler<RefreshTokenCommand,
       }
 
       const userId = payload.sub;
+      const tokenJti = payload.jti;
 
       // Hash the token to find it in the database
       const tokenHash = await this.tokenService.hashToken(refreshToken);
 
       // Find the refresh token in the database
       const storedToken = await this.refreshTokenRepository.findByToken(tokenHash);
-      
+
       if (!storedToken) {
         this.logger.warn(`Refresh token not found in database`);
         return {
@@ -58,6 +59,32 @@ export class RefreshTokenHandler implements ICommandHandler<RefreshTokenCommand,
         return {
           success: false,
           error: RefreshTokenError.TOKEN_EXPIRED,
+        };
+      }
+
+      // Validate JTI consistency
+      if (storedToken.jti !== tokenJti) {
+        this.logger.warn(`JTI mismatch for refresh token: ${userId}`);
+        return {
+          success: false,
+          error: RefreshTokenError.INVALID_TOKEN,
+        };
+      }
+
+      // Fingerprint validation: compare IP and User Agent
+      if (ipAddress && storedToken.ipAddress && ipAddress !== storedToken.ipAddress) {
+        this.logger.warn(`IP address mismatch for refresh token: ${userId}. Expected: ${storedToken.ipAddress}, Got: ${ipAddress}`);
+        return {
+          success: false,
+          error: RefreshTokenError.INVALID_TOKEN,
+        };
+      }
+
+      if (userAgent && storedToken.userAgent && userAgent !== storedToken.userAgent) {
+        this.logger.warn(`User Agent mismatch for refresh token: ${userId}`);
+        return {
+          success: false,
+          error: RefreshTokenError.INVALID_TOKEN,
         };
       }
 
@@ -80,25 +107,33 @@ export class RefreshTokenHandler implements ICommandHandler<RefreshTokenCommand,
         };
       }
 
-      // Generate new tokens
+      // ATOMIC OPERATION: Revoke old token FIRST, before generating new tokens
+      // This prevents replay attacks by ensuring the token can only be used once
+      const wasRevoked = await this.refreshTokenRepository.revokeAtomically(storedToken.id);
+      
+      if (!wasRevoked) {
+        // Token was already revoked by another concurrent request - replay attack detected
+        this.logger.warn(`Replay attack detected: token already revoked for user: ${userId}`);
+        return {
+          success: false,
+          error: RefreshTokenError.TOKEN_REVOKED,
+        };
+      }
+
+      // Generate new tokens AFTER successful revocation
       const newAccessToken = await this.tokenService.generateAccessToken(user.id, user.email);
       const newRefreshTokenData = await this.tokenService.generateRefreshToken(user.id);
       const newRefreshTokenHash = await this.tokenService.hashToken(newRefreshTokenData.token);
-
-      // Revoke old refresh token
-      await this.refreshTokenRepository.revoke(storedToken.id);
 
       // Store new refresh token
       await this.refreshTokenRepository.create(
         user.id,
         newRefreshTokenHash,
+        newRefreshTokenData.jti,
         newRefreshTokenData.expiresAt,
         ipAddress,
         userAgent,
       );
-
-      // Update last used time
-      await this.refreshTokenRepository.recordUsage(storedToken.id);
 
       this.logger.log(`Token refreshed successfully for user: ${userId}`);
 

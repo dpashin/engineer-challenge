@@ -97,13 +97,14 @@ export class LoginHandler implements ICommandHandler<LoginCommand, LoginResult> 
 
       // Generate tokens
       const accessToken = await this.tokenService.generateAccessToken(user.id, user.email);
-      const { token: refreshToken, expiresAt } = await this.tokenService.generateRefreshToken(user.id);
+      const { token: refreshToken, expiresAt, jti } = await this.tokenService.generateRefreshToken(user.id);
       const refreshTokenHash = await this.tokenService.hashToken(refreshToken);
 
       // Save refresh token
       await this.refreshTokenRepository.create(
         user.id,
         refreshTokenHash,
+        jti,
         expiresAt,
         ipAddress,
         userAgent,

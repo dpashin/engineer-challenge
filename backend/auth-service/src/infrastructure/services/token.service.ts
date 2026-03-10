@@ -6,6 +6,7 @@ import { sign, verify } from 'jsonwebtoken';
 export interface JwtPayload {
   sub: string; // userId
   email: string;
+  jti: string; // unique token identifier
   iat?: number;
   exp?: number;
 }
@@ -46,6 +47,7 @@ export class TokenService {
     const payload: JwtPayload = {
       sub: userId,
       email,
+      jti: crypto.randomBytes(16).toString('hex'),
     };
 
     return sign(payload, this.accessTokenSecret, {
@@ -56,10 +58,12 @@ export class TokenService {
   /**
    * Generate JWT refresh token with metadata
    */
-  async generateRefreshToken(userId: string): Promise<{ token: string; expiresAt: Date }> {
+  async generateRefreshToken(userId: string): Promise<{ token: string; expiresAt: Date; jti: string }> {
+    const jti = crypto.randomBytes(16).toString('hex');
     const payload: JwtPayload = {
       sub: userId,
       email: '', // Don't include email in refresh token
+      jti,
     };
 
     const token = sign(payload, this.refreshTokenSecret, {
@@ -69,7 +73,7 @@ export class TokenService {
     const expiresAt = new Date();
     expiresAt.setSeconds(expiresAt.getSeconds() + this.refreshTokenExpiresIn);
 
-    return { token, expiresAt };
+    return { token, expiresAt, jti };
   }
 
   /**
