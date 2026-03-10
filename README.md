@@ -153,6 +153,7 @@ UI-дизайн (https://www.figma.com/design/31KetUbya482vMSGgyiNIf/Orbitto-%7C
 ### Infrastructure
 - **Docker & Docker Compose** - Контейнеризация
 - **PostgreSQL 17** - База данных
+- **Redis 7** - Rate limiting (sliding window log)
 - **Mailcatcher** - Тестовый SMTP сервер
 - **Nginx** - Reverse proxy для frontend
 
@@ -204,6 +205,7 @@ docker-compose ps
 - **GraphQL API**: http://localhost:3000/graphql
 - **Mailcatcher**: http://localhost:1080 (для просмотра писем)
 - **PostgreSQL**: localhost:5432
+- **Redis**: localhost:6379
 
 ### Остановка приложения
 
@@ -271,6 +273,18 @@ docker-compose ps
 
 ### Rate limiting
 
+Rate limiting реализован с использованием **Redis** и алгоритма **Sliding Window Log**:
+
+- **LOGIN_BY_EMAIL** — ограничение неудачных попыток входа по email
+- **LOGIN_BY_IP** — ограничение по IP адресу
+- **REGISTER_BY_EMAIL** — ограничение регистраций по email
+- **REGISTER_BY_IP** — ограничение регистраций по IP
+- **PASSWORD_RESET_BY_EMAIL** — ограничение запросов сброса пароля
+- **PASSWORD_RESET_BY_IP** — ограничение по IP для сброса пароля
+- **TOKEN_REFRESH** — ограничение refresh token запросов
+- **API_GLOBAL** — глобальное ограничение API
+
+**Ключевые инварианты:**
 - Если пользователь вводит присланный код неправильно несколько раз (3 попытки), возможность запроса нового кода блокируется на длительный срок (30 минут).
 
 - [ ] Ограничения на повторный запрос токена восстановления пароля.

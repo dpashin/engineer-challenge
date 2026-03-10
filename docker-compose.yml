@@ -19,6 +19,22 @@ services:
     networks:
       - auth-network
 
+  redis:
+    image: redis:7-alpine
+    container_name: auth-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - auth-network
+    restart: unless-stopped
+
   mailcatcher:
     image: sj26/mailcatcher:latest
     container_name: mailcatcher
@@ -44,6 +60,8 @@ services:
       DB_USER: auth
       DB_PASSWORD: auth_password
       DB_POOL_SIZE: 10
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
       JWT_ACCESS_SECRET: your-super-secret-access-key-change-in-production
       JWT_REFRESH_SECRET: your-super-secret-refresh-key-change-in-production
       JWT_ACCESS_EXPIRES_IN: 3600
@@ -56,6 +74,8 @@ services:
       - "3000:3000"
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks:
       - auth-network
@@ -79,6 +99,7 @@ services:
 
 volumes:
   db_data:
+  redis_data:
 
 networks:
   auth-network:
