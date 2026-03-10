@@ -1,0 +1,35 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#E3F2FD', 'primaryTextColor': '#1A1A1A', 'primaryBorderColor': '#1565C0', 'lineColor': '#1565C0', 'secondaryColor': '#FFF3E0', 'tertiaryColor': '#E8F5E9' } } }%%
+stateDiagram-v2
+    direction TB
+
+    %% Пользователь
+    state "Пользователь\n(человек)" as User {
+        state "Взаимодействует с фронтендом" as UserAction
+    }
+
+    %% Frontend
+    state "Frontend\n(клиентское приложение)" as Frontend {
+        state "Формы регистрации,\nавторизации и\nвосстановления пароля" as Forms
+    }
+
+    %% Backend (Command + Query Side)
+    state "Backend\n(Command Side + Query Side + Domain Model)" as Backend {
+        state "Command Side\n(команды: регистрация,\nавторизация, восстановление)" as CommandSide
+        state "Query Side\n(запросы: чтение данных)" as QuerySide
+        state "Domain Model\n(бизнес-правила,\nинварианты, агрегаты)" as DomainModel
+    }
+
+    %% PostgreSQL
+    state "PostgreSQL\n(хранилище данных)" as Database {
+        state "Таблицы:\nпользователи,\nтокены" as Tables
+    }
+
+    %% Связи
+    User --> Frontend: "Вводит данные\n(логин, пароль, email)"
+    Frontend --> Backend
+    
+    CommandSide --> DomainModel: "Применяет\nбизнес-правила"
+    QuerySide --> DomainModel: "Читает\nданные"
+
+    CommandSide --> Database: "Запись/обновление\n(пароли хешированы,\ntoken expiration)"
+    QuerySide --> Database: "Чтение данных"

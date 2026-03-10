@@ -44,17 +44,19 @@ UI-дизайн (https://www.figma.com/design/31KetUbya482vMSGgyiNIf/Orbitto-%7C
 - Плюс в оценке: Terraform/Kubernetes manifests/Helm.
 
 4. Безопасность
-- Без хранения паролей в открытом виде.
-- Корректная работа с токенами/сессиями.
+- [x] Без хранения паролей в открытом виде.
+- [x] Корректная работа с токенами/сессиями.
 - Защита базовых auth-флоу (rate limiting, expiration, replay/abuse considerations).
 
 5. Наблюдаемость и качество
 - Логи, метрики или трейсинг (минимум один из блоков).
-- Тесты критичных участков (доменные правила, auth-флоу, интеграционные точки).
+Логи добавлены, 
+- [x] Тесты критичных участков (доменные правила, auth-флоу, интеграционные точки).
+> см. [Запуск тестов](#запуск-тестов)
 
 6. Технологические решения
-- Язык программирования и фреймворки выбираете самостоятельно.
-- В `README` обязательно зафиксируйте, почему выбрали именно этот стек и какие альтернативы рассматривали.
+- [x] Язык программирования и фреймворки выбираете самостоятельно.
+- [ ] В `README` обязательно зафиксируйте, почему выбрали именно этот стек и какие альтернативы рассматривали.
 
 ## Ограничения и анти-паттерны
 
@@ -69,12 +71,15 @@ UI-дизайн (https://www.figma.com/design/31KetUbya482vMSGgyiNIf/Orbitto-%7C
 
 1. Исходный код в вашем fork.
 2. Обновленный `README` в вашем fork с:
-- как запустить проект;
+- [x] как запустить проект;
+> см. [Быстрый старт](#быстрый-старт)
 - архитектурная схема (можно Mermaid/PlantUML);
 - объяснение, где в решении DDD, CQRS и IaC;
 - ключевые компромиссы (trade-offs);
-- что сделали бы следующим шагом в production-версии.
-3. Минимальный набор тестов и инструкции по их запуску.
+- [x] что сделали бы следующим шагом в production-версии.
+> см. [TODO](#todo)
+3. [x] Минимальный набор тестов и инструкции по их запуску.
+> см. [Запуск тестов](#запуск-тестов)
 
 ## Формат выполнения
 
@@ -112,3 +117,128 @@ UI-дизайн (https://www.figma.com/design/31KetUbya482vMSGgyiNIf/Orbitto-%7C
 ## Важно
 
 Нас интересует не «идеальный продакшен за вечер», а качество инженерного мышления и способность строить систему осознанно.
+
+# Реализация
+
+## Технологии
+
+### Backend
+- **NestJS** - Node.js фреймворк с поддержкой DDD/CQRS
+- **GraphQL (Apollo)** - API слой
+- **PostgreSQL** - Реляционная БД
+- **TypeScript** - Типизация
+- **CQRS (@nestjs/cqrs)** - Разделение команд и запросов
+
+### Frontend
+- **Vue.js 3** - Composition API
+- **TypeScript** - Типизация
+- **Pinia** - Управление состоянием
+- **Vue Router** - Маршрутизация
+- **Apollo Client** - GraphQL клиент
+- **Bootstrap 5** - Стилизация
+- **Vite** - Сборка
+
+### Infrastructure
+- **Docker & Docker Compose** - Контейнеризация
+- **PostgreSQL 17** - База данных
+- **Mailcatcher** - Тестовый SMTP сервер
+- **Nginx** - Reverse proxy для frontend
+
+## Структура проекта
+
+```
+engineer-challenge/
+├── backend/
+│   └── auth-service/       # NestJS GraphQL API с DDD/CQRS
+│       ├── src/
+│       │   ├── domain/         # Доменная модель
+│       │   ├── application/    # Команды, запросы, обработчики
+│       │   ├── infrastructure/ # Репозитории, сервисы
+│       │   └── presentation/   # GraphQL резолверы, DTO
+│       └── ...
+├── frontend/               # Vue.js 3 + TypeScript
+│   ├── src/
+│   │   ├── components/       # UI компоненты
+│   │   ├── views/            # Страницы
+│   │   ├── stores/           # Pinia хранилища
+│   │   ├── router/           # Маршрутизация
+│   │   └── graphql/          # GraphQL запросы
+│   └── ...
+├── db/                     # SQL скрипты для БД
+├── doc/                    # Документация
+├── docker-compose.yml      # Оркестрация сервисов
+└── ...
+```
+
+
+## Быстрый старт
+
+### Запуск всего приложения
+
+```bash
+# Клонировать репозиторий
+git clone <repository-url>
+cd engineer-challenge
+
+# Запустить все сервисы
+docker-compose up -d --build
+
+# Проверить статус
+docker-compose ps
+```
+
+После запуска:
+- **Frontend**: http://localhost:4200
+- **GraphQL API**: http://localhost:3000/graphql
+- **Mailcatcher**: http://localhost:1080 (для просмотра писем)
+- **PostgreSQL**: localhost:5432
+
+### Остановка приложения
+
+```bash
+docker-compose down
+```
+
+### Запуск тестов
+
+```bash
+docker build --target dev -t auth-service-dev ./backend/auth-service && docker run --rm auth-service-dev npm run test:dev
+```
+
+### Production Deployment
+
+Для production окружения используйте отдельный compose файл с hardened настройками:
+
+```bash
+# 1. Скопируйте .env.example и заполните переменные
+cp .env.example .env
+
+# 2. Заполните .env реальными значениями (особенно секреты!)
+# Сгенерируйте JWT секреты: openssl rand -base64 32
+
+# 3. Запустите production стек
+docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+
+# 4. Проверьте статус
+docker-compose ps
+```
+
+**Production отличия:**
+- `NODE_ENV=production`
+- Все секреты через environment variables (обязательные переменные помечены `?` в compose файле)
+- Mailcatcher исключён (используйте реальный SMTP)
+- Health checks для всех сервисов
+- `restart: always` для авто-восстановления
+- Нет hardcoded secrets в docker-compose файлах
+
+## TODO
+
+- [ ] красивые миграции в базе (dbmate, ...)
+- [ ] подумать на предмет замены localstorage на куки
+- [ ] @twelve-factor
+- [ ] Логин - валидация пароля сообщение на английском
+- [ ] Научить бэк отдавать отдавать health статус
+- [ ] hot rebuild для дев среды
+
+
+

@@ -1,0 +1,10 @@
+Прочитай @doc/README.md
+
+Нарисуй plantuml sequence diagram для процессов авторизации.
+
+Текст должен быть хорошо виден на диаграммах.
+
+Сохрани результаты в формате mermaid в каталоге doc.
+Each diagram should be in a separate file to comply with Mermaid’s single-diagram-per-file syntax.
+Every file should contain pure Mermaid diagram definitions without markdown code fences.
+

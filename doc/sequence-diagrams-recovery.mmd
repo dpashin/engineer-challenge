@@ -1,0 +1,77 @@
+%% Password Recovery Process
+%% File: sequence-diagrams-recovery.mmd
+sequenceDiagram
+    autonumber
+    actor User
+    participant Frontend as Frontend
+    participant API as GraphQL API
+    participant Command as Command Side
+    participant Domain as Domain Model
+    participant DB as PostgreSQL
+
+    User->>Frontend: Click Forgot Password
+    Frontend->>API: POST /graphql (RequestPasswordResetMutation)
+    API->>Command: Handle RequestPasswordResetCommand
+    Command->>Domain: Find User by Email
+    Domain->>DB: Query user by email
+    DB-->>Domain: User data or null
+    Domain->>Domain: Invalidate existing reset tokens
+    Domain->>DB: Revoke previous tokens
+    Command->>Domain: Generate Crypto-Secure Reset Token CSPRNG
+    Domain->>Domain: Generate 128+ bit entropy token
+    Command->>Domain: Hash Reset Token SHA-256
+    Command->>DB: Store Token Hash and Expiration 10 min
+    DB-->>Command: Token stored
+    Command->>Frontend: Send reset email async
+    Frontend-->>User: Check your email
+
+    User->>Frontend: Enter reset token from email
+    Frontend->>API: POST /graphql (VerifyResetTokenMutation)
+    API->>Command: Handle VerifyResetTokenCommand
+    Command->>Domain: Check Rate Limit max 3 attempts
+    Domain->>DB: Query failed attempts
+    alt Too many failed attempts
+        DB-->>Domain: Attempts >= 3
+        Domain->>Domain: Block for 30 minutes
+        Domain-->>Command: RateLimitExceededError
+        Command-->>API: Too many attempts
+        API-->>Frontend: Try again in 30 min
+        Frontend-->>User: Blocked
+    else Attempts OK
+        DB-->>Domain: Attempts less than 3
+        Command->>Domain: Hash Submitted Token
+        Domain->>DB: Query token hash and expiration
+        DB-->>Domain: Token data
+        alt Token invalid or expired
+            Domain-->>Command: InvalidTokenError
+            Command->>DB: Increment failed attempts
+            Command-->>API: Invalid token
+            API-->>Frontend: Error message
+            Frontend-->>User: Invalid or expired token
+        else Token valid
+            Domain-->>Command: Token verified
+            Command->>DB: Reset failed attempts counter
+            User->>Frontend: Enter new password
+            Frontend->>API: POST /graphql (ResetPasswordMutation)
+            API->>Command: Handle ResetPasswordCommand
+            Command->>Domain: Validate Password Strength
+            Domain->>Domain: Check length >= 8 chars
+            Domain->>Domain: Check uppercase lowercase digits special chars
+            alt Password weak
+                Domain-->>Command: WeakPasswordError
+                Command-->>API: Password too weak
+                API-->>Frontend: Error message
+                Frontend-->>User: Password reqFrontendrements
+            else Password strong
+                Domain-->>Command: Password valid
+                Command->>Domain: Hash New Password
+                Command->>DB: Update password hash
+                Command->>Domain: Invalidate Reset Token single-use
+                Command->>DB: Delete or Revoke used token
+                DB-->>Command: Password updated
+                Command-->>API: ResetPasswordResult
+                API-->>Frontend: Success
+                Frontend-->>User: Password changed
+            end
+        end
+    end

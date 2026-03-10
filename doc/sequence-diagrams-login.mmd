@@ -1,0 +1,44 @@
+%% Login Process
+%% File: sequence-diagrams-login.mmd
+sequenceDiagram
+    autonumber
+    actor User
+    participant Frontend as Frontend
+    participant API as GraphQL API
+    participant Command as Command Side
+    participant Domain as Domain Model
+    participant DB as PostgreSQL
+
+    User->>Frontend: Enter credentials
+    Frontend->>API: POST /graphql (LoginMutation)
+    API->>Command: Handle LoginCommand
+    Command->>Domain: Find User by Email
+    Domain->>DB: Query user
+    alt User not found
+        DB-->>Domain: No user found
+        Domain-->>Command: UserNotFoundError
+        Command-->>API: Invalid credentials
+        API-->>Frontend: Error message
+        Frontend-->>User: Login failed
+    else User found
+        DB-->>Domain: User data
+        Command->>Domain: Verify Password Hash
+        Domain->>Domain: CompareHash(password, storedHash)
+        alt Invalid password
+            Domain-->>Command: InvalidPasswordError
+            Command-->>API: Invalid credentials
+            API-->>Frontend: Error message
+            Frontend-->>User: Login failed
+        else Valid password
+            Domain-->>Command: Password verified
+            Command->>Domain: Check Rate Limit
+            Domain->>DB: Check failed attempts
+            DB-->>Domain: Attempts OK
+            Command->>DB: Generate JWT Token
+            Command->>DB: Reset failed attempts counter
+            DB-->>Command: Token generated
+            Command-->>API: LoginResult and JWT
+            API-->>Frontend: Success and JWT
+            Frontend-->>User: Login successful
+        end
+    end

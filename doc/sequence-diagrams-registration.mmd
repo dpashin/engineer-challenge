@@ -1,0 +1,28 @@
+%% Registration Process
+%% File: sequence-diagrams-registration.mmd
+sequenceDiagram
+    autonumber
+    actor User
+    participant Frontend as Frontend
+    participant API as GraphQL API
+    participant Command as Command Side
+    participant Domain as Domain Model
+    participant DB as PostgreSQL
+
+    User->>Frontend: Enter registration data
+    Frontend->>API: POST /graphql (RegisterMutation)
+    API->>Command: Handle RegisterCommand
+    Command->>Domain: Validate Email Uniqueness
+    Domain->>DB: Query existing email
+    DB-->>Domain: Email not found
+    Command->>Domain: Validate Password Strength
+    Domain->>Domain: Check length >= 8 chars
+    Domain->>Domain: Check uppercase, lowercase, digits, special chars
+    Command->>Domain: Hash Password (bcrypt/argon2)
+    Domain->>DB: CreateUser
+    DB-->>Command: User created
+    Command->>DB: Generate and Store JWT
+    DB-->>Command: Token stored
+    Command-->>API: RegistrationResult
+    API-->>Frontend: Success and JWT
+    Frontend-->>User: Registration complete

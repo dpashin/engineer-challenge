@@ -1,0 +1,9 @@
+docker-compose.prompt
+
+Создай docker-compose.yml cо следующими контейнерами:
+
+1. db
+Postgresql 17, скрипты создания базы и таблиц возьми в @db/create_db.sql и @db/create_tables.sql
+
+
+

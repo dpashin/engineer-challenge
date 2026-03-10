@@ -1,0 +1,85 @@
+services:
+  db:
+    image: postgres:17
+    container_name: auth-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./db/create_db.sql:/docker-entrypoint-initdb.d/01_create_db.sql
+      - ./db/create_tables.sql:/docker-entrypoint-initdb.d/02_create_tables.sql
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - auth-network
+
+  mailcatcher:
+    image: sj26/mailcatcher:latest
+    container_name: mailcatcher
+    ports:
+      - "1025:1025"
+      - "1080:1080"
+    networks:
+      - auth-network
+    restart: unless-stopped
+
+  auth-service:
+    build:
+      context: ./backend/auth-service
+      dockerfile: Dockerfile
+      target: production
+    container_name: auth-service
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: auth
+      DB_USER: auth
+      DB_PASSWORD: auth_password
+      DB_POOL_SIZE: 10
+      JWT_ACCESS_SECRET: your-super-secret-access-key-change-in-production
+      JWT_REFRESH_SECRET: your-super-secret-refresh-key-change-in-production
+      JWT_ACCESS_EXPIRES_IN: 3600
+      JWT_REFRESH_EXPIRES_IN: 604800
+      CORS_ORIGIN: http://localhost:4200,http://localhost:5173
+      SMTP_HOST: mailcatcher
+      SMTP_PORT: 1025
+      SMTP_FROM: noreply@auth-service.local
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - auth-network
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: production
+    container_name: frontend
+    environment:
+      VITE_GRAPHQL_ENDPOINT: http://localhost:3000/graphql
+    ports:
+      - "4200:80"
+    depends_on:
+      - auth-service
+    networks:
+      - auth-network
+    restart: unless-stopped
+
+volumes:
+  db_data:
+
+networks:
+  auth-network:
+    driver: bridge

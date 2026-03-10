@@ -1,0 +1,7 @@
+Прочитай описание системы в @doc
+
+Добавь в систему сервис mailcatcher.
+
+Он должен появиться в Dockerfile.
+Сервис @backend/auth-service должен использовать mailcatcher для отправки писем.
+Добавь описание сервиса в @doc/system-context.mmd 
