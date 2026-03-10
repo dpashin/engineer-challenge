@@ -140,6 +140,7 @@ UI-дизайн (https://www.figma.com/design/31KetUbya482vMSGgyiNIf/Orbitto-%7C
 - **PostgreSQL** - Реляционная БД
 - **TypeScript** - Типизация
 - **CQRS (@nestjs/cqrs)** - Разделение команд и запросов
+- **Redis (ioredis)** - Rate limiting (sliding window log)
 
 ### Frontend
 - **Vue.js 3** - Composition API

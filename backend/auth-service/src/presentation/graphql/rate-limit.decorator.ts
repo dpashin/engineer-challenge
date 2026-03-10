@@ -1,5 +1,5 @@
 import { SetMetadata } from '@nestjs/common';
-import { RateLimitType } from '../../infrastructure/services/rate-limit/rate-limit.service';
+import { RateLimitType } from '../../infrastructure/services/rate-limit/rate-limit-type.enum';
 
 export const RATE_LIMIT_METADATA_KEY = 'rate_limit';
 

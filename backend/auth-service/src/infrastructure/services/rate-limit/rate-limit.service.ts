@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Redis } from 'ioredis';
+import { RateLimitType } from './rate-limit-type.enum';
 
 export interface RateLimitResult {
   allowed: boolean;
@@ -8,27 +9,16 @@ export interface RateLimitResult {
   retryAfter?: number;
 }
 
-export enum RateLimitType {
-  LOGIN_BY_EMAIL = 'login:by_email',
-  LOGIN_BY_IP = 'login:by_ip',
-  REGISTER_BY_IP = 'register:by_ip',
-  PASSWORD_RESET_BY_EMAIL = 'password_reset:by_email',
-  PASSWORD_RESET_BY_IP = 'password_reset:by_ip',
-  REGISTER_BY_EMAIL = 'register:by_email',
-  TOKEN_REFRESH = 'token:refresh',
-  API_GLOBAL = 'api:global',
-}
-
 export interface RateLimitConfigEntry {
   limit: number;
   ttl: number; // in milliseconds
 }
 
 /**
- * Rate Limiting Service using Redis with @nestjs/throttler compatible approach
+ * Rate Limiting Service using Redis with Sliding Window Log algorithm
  * 
  * Uses Redis-backed storage for distributed rate limiting across multiple instances.
- * Implements fixed window counter algorithm (same as @nestjs/throttler default).
+ * Implements sliding window log algorithm using Redis Sorted Sets (ZSET).
  */
 @Injectable()
 export class RateLimitService {
@@ -59,8 +49,7 @@ export class RateLimitService {
   }
 
   /**
-   * Check rate limit for a specific type using fixed window counter
-   * (Same algorithm as @nestjs/throttler)
+   * Check rate limit for a specific type using sliding window log
    */
   async checkLimitByType(
     type: RateLimitType,
