@@ -7,6 +7,7 @@ import { PasswordHasher } from '../../infrastructure/services/password-hasher.se
 import { TokenService } from '../../infrastructure/services/token.service';
 import { RefreshTokenRepository } from '../../infrastructure/repositories/refresh-token.repository';
 import { RateLimitService, RateLimitType } from '../../infrastructure/services/rate-limit';
+import { AccountLockoutService } from '../../infrastructure/services/account-lockout.service';
 
 @CommandHandler(LoginCommand)
 export class LoginHandler implements ICommandHandler<LoginCommand, LoginResult> {
@@ -18,6 +19,7 @@ export class LoginHandler implements ICommandHandler<LoginCommand, LoginResult> 
     private readonly tokenService: TokenService,
     private readonly refreshTokenRepository: RefreshTokenRepository,
     private readonly rateLimitService: RateLimitService,
+    private readonly accountLockoutService: AccountLockoutService,
   ) {}
 
   async execute(command: LoginCommand): Promise<LoginResult> {
@@ -31,7 +33,7 @@ export class LoginHandler implements ICommandHandler<LoginCommand, LoginResult> 
         RateLimitType.LOGIN_BY_EMAIL,
         email,
       );
-      
+
       if (!emailLimitResult.allowed) {
         this.logger.warn(
           `Login rate limit exceeded for email: ${email}. Retry after: ${emailLimitResult.retryAfter}s`,
@@ -49,7 +51,7 @@ export class LoginHandler implements ICommandHandler<LoginCommand, LoginResult> 
           RateLimitType.LOGIN_BY_IP,
           ipAddress,
         );
-        
+
         if (!ipLimitResult.allowed) {
           this.logger.warn(
             `Login rate limit exceeded for IP: ${ipAddress}. Retry after: ${ipLimitResult.retryAfter}s`,
@@ -66,10 +68,33 @@ export class LoginHandler implements ICommandHandler<LoginCommand, LoginResult> 
       const user = await this.userRepository.findByEmail(email);
       if (!user) {
         this.logger.warn(`User not found: ${email}`);
+        // Применяем прогрессивную задержку даже для несуществующих пользователей
+        await this.applyProgressiveDelayForEmail(email);
         return {
           success: false,
           error: LoginError.USER_NOT_FOUND,
         };
+      }
+
+      // Проверка блокировки аккаунта
+      if (user.lockedUntil) {
+        const lockoutStatus = await this.accountLockoutService.checkLockoutStatus(
+          user.id,
+          user.failedLoginAttempts,
+          user.lockedUntil,
+        );
+
+        if (lockoutStatus.isLocked) {
+          this.logger.warn(
+            `Account is locked: ${email}. Locked until: ${lockoutStatus.lockedUntil?.toISOString()}`,
+          );
+          return {
+            success: false,
+            error: LoginError.ACCOUNT_LOCKED,
+            retryAfter: lockoutStatus.remainingLockoutSeconds,
+            lockedUntil: lockoutStatus.lockedUntil?.toISOString(),
+          };
+        }
       }
 
       // Check if account is active
@@ -85,12 +110,26 @@ export class LoginHandler implements ICommandHandler<LoginCommand, LoginResult> 
       const isPasswordValid = await this.passwordHasher.compare(password, user.passwordHash);
       if (!isPasswordValid) {
         this.logger.warn(`Invalid password for: ${email}`);
-        await this.userRepository.recordFailedLogin(user.id);
+        
+        // Обработка неудачной попытки входа с блокировкой и прогрессивной задержкой
+        const lockoutStatus = await this.accountLockoutService.handleFailedLogin(user.id, email);
+        
+        // Применяем прогрессивную задержку перед ответом
+        if (lockoutStatus.shouldApplyDelay && !lockoutStatus.isLocked) {
+          await this.accountLockoutService.applyProgressiveDelay(lockoutStatus.delayMs);
+        }
+
         return {
           success: false,
           error: LoginError.INVALID_PASSWORD,
+          retryAfter: lockoutStatus.isLocked ? lockoutStatus.remainingLockoutSeconds : undefined,
+          lockedUntil: lockoutStatus.lockedUntil?.toISOString(),
+          failedAttempts: lockoutStatus.failedAttempts,
         };
       }
+
+      // Успешный вход - сбрасываем блокировки
+      await this.accountLockoutService.handleSuccessfulLogin(user.id, email);
 
       // Reset failed login attempts on successful login
       await this.userRepository.resetFailedLogins(user.id);
@@ -127,5 +166,16 @@ export class LoginHandler implements ICommandHandler<LoginCommand, LoginResult> 
         error: LoginError.INTERNAL_ERROR,
       };
     }
+  }
+
+  /**
+   * Применение прогрессивной задержки для несуществующих пользователей
+   * (защита от enumeration attacks)
+   */
+  private async applyProgressiveDelayForEmail(email: string): Promise<void> {
+    // Для несуществующих пользователей используем фиктивную задержку
+    // чтобы злоумышленник не мог определить существование аккаунта по времени ответа
+    const fakeDelay = 1000; // 1 секунда
+    await new Promise(resolve => setTimeout(resolve, fakeDelay));
   }
 }

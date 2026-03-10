@@ -4,6 +4,7 @@ export enum LoginErrorCode {
   USER_NOT_FOUND = 'USER_NOT_FOUND',
   INVALID_PASSWORD = 'INVALID_PASSWORD',
   ACCOUNT_LOCKED = 'ACCOUNT_LOCKED',
+  TOO_MANY_REQUESTS = 'TOO_MANY_REQUESTS',
   INTERNAL_ERROR = 'INTERNAL_ERROR',
 }
 
@@ -36,4 +37,13 @@ export class LoginResultType {
 
   @Field(() => LoginErrorType, { nullable: true })
   error?: LoginErrorType;
+
+  @Field(() => Number, { nullable: true })
+  retryAfter?: number;
+
+  @Field(() => String, { nullable: true })
+  lockedUntil?: string;
+
+  @Field(() => Number, { nullable: true })
+  failedAttempts?: number;
 }

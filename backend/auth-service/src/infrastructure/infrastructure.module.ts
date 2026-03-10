@@ -11,6 +11,8 @@ import { PasswordHasher } from './services/password-hasher.service';
 import { TokenService } from './services/token.service';
 import { EmailService } from './services/email.service';
 import { CookieMiddleware } from './middleware/cookie.middleware';
+import { AccountLockoutService } from './services/account-lockout.service';
+import { AccountLockoutPolicyService } from '../domain/account-lockout-policy.service';
 
 @Global()
 @Module({
@@ -23,6 +25,8 @@ import { CookieMiddleware } from './middleware/cookie.middleware';
     TokenService,
     EmailService,
     CookieMiddleware,
+    AccountLockoutService,
+    AccountLockoutPolicyService,
   ],
   exports: [
     DatabaseModule,
@@ -33,6 +37,8 @@ import { CookieMiddleware } from './middleware/cookie.middleware';
     TokenService,
     EmailService,
     RateLimitModule,
+    AccountLockoutService,
+    AccountLockoutPolicyService,
   ],
 })
 export class InfrastructureModule implements NestModule {

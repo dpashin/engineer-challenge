@@ -49,12 +49,12 @@ UI-дизайн (https://www.figma.com/design/31KetUbya482vMSGgyiNIf/Orbitto-%7C
 4. Безопасность
 - [x] Без хранения паролей в открытом виде.
 - [x] Корректная работа с токенами/сессиями.
-- [ ] Защита базовых auth-флоу
+- [x] Защита базовых auth-флоу
     - [x] rate limiting
     > [здесь](#rate-limiting)
     - [x] expiration
     > [здесь](#токены)
-    - [ ] replay/abuse considerations
+    - [x] replay/abuse considerations
     > [здесь](#refresh-token)
 
 5. Наблюдаемость и качество

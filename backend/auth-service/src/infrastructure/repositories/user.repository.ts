@@ -15,11 +15,12 @@ export class UserRepository {
     failedLoginAttempts: number;
     resetRequestBlockedUntil: Date | null;
     failedResetAttempts: number;
+    lockedUntil: Date | null;
   } | null> {
     const rows = await this.db.query(
       `SELECT id, email, password_hash, is_active,
               failed_login_attempts, reset_request_blocked_until,
-              failed_reset_attempts
+              failed_reset_attempts, locked_until
        FROM users
        WHERE email = $1 AND deleted_at IS NULL`,
       [email],
@@ -38,6 +39,7 @@ export class UserRepository {
       failedLoginAttempts: row.failed_login_attempts,
       resetRequestBlockedUntil: row.reset_request_blocked_until,
       failedResetAttempts: row.failed_reset_attempts,
+      lockedUntil: row.locked_until ? new Date(row.locked_until) : null,
     };
   }
 
@@ -123,5 +125,46 @@ export class UserRepository {
        WHERE id = $1`,
       [userId],
     );
+  }
+
+  async lockAccount(userId: string, lockedUntil: Date): Promise<void> {
+    await this.db.query(
+      `UPDATE users
+       SET locked_until = $1,
+           updated_at = NOW()
+       WHERE id = $2`,
+      [lockedUntil, userId],
+    );
+  }
+
+  async unlockAccount(userId: string): Promise<void> {
+    await this.db.query(
+      `UPDATE users
+       SET locked_until = NULL,
+           failed_login_attempts = 0,
+           last_failed_login_at = NULL,
+           updated_at = NOW()
+       WHERE id = $1`,
+      [userId],
+    );
+  }
+
+  async isAccountLocked(userId: string): Promise<{ locked: boolean; lockedUntil: Date | null }> {
+    const rows = await this.db.query(
+      `SELECT locked_until
+       FROM users
+       WHERE id = $1`,
+      [userId],
+    );
+
+    if (rows.length === 0) {
+      return { locked: false, lockedUntil: null };
+    }
+
+    const row = rows[0];
+    const lockedUntil = row.locked_until ? new Date(row.locked_until) : null;
+    const locked = lockedUntil !== null && lockedUntil > new Date();
+
+    return { locked, lockedUntil };
   }
 }

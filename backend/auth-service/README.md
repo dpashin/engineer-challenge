@@ -55,6 +55,37 @@ This service follows Domain-Driven Design (DDD) and Command Query Responsibility
 - Rate limiting on password reset requests
 - Account lockout after failed login attempts
 
+### Auth Flow Abuse Protection
+
+**Account Lockout & Progressive Delays:**
+- Account is temporarily locked after **5 failed login attempts** for **30 minutes**
+- Progressive delays applied after 3+ failed attempts:
+  - 3 attempts → 2 second delay
+  - 4 attempts → 5 second delay
+  - 5+ attempts → 10 second delay
+- Automatic unlock after lockout period expires
+- Failed attempt counter reset on successful login
+- Protection against user enumeration (constant delay for non-existent users)
+
+**Rate Limiting (Redis-backed):**
+- Login attempts: 3 per 30 min (by email), 10 per 15 min (by IP)
+- Registration: 5 per hour (by IP), 3 per hour (by email)
+- Password reset: 3 per 30 min (by email), 10 per 15 min (by IP)
+- Token refresh: 5 per minute
+
+**Configuration (environment variables):**
+```bash
+ACCOUNT_LOCKOUT_MAX_ATTEMPTS=5
+ACCOUNT_LOCKOUT_DURATION_MS=1800000  # 30 minutes
+PROGRESSIVE_DELAYS_ENABLED=true
+REDIS_URL=redis://localhost:6379
+```
+
+**Database Migration:**
+```bash
+psql $DATABASE_URL < migrations/002_add_account_lockout_fields.sql
+```
+
 ## GraphQL API
 
 ### Mutations
@@ -200,3 +231,14 @@ src/
 - Rate limiting: 3 failed attempts = 30-minute block
 - Cryptographically secure generation (CSPRNG)
 - SHA-256 hashing for storage
+
+### Account Lockout Policy
+- **Max failed attempts:** 5 before temporary lockout
+- **Lockout duration:** 30 minutes
+- **Progressive delays:** Applied after 3+ failed attempts
+  - 3 attempts: 2 second delay before response
+  - 4 attempts: 5 second delay before response
+  - 5+ attempts: 10 second delay before response
+- **Auto-unlock:** Account automatically unlocked after lockout period
+- **Reset on success:** Failed attempt counter reset on successful login
+- **Enumeration protection:** Constant 1-second delay for non-existent users
