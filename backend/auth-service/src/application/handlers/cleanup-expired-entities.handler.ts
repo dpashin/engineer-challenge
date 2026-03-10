@@ -7,7 +7,6 @@ import { DatabaseService } from '../../infrastructure/database/database.service'
 
 export interface CleanupResult {
   passwordResetTokensDeleted: number;
-  passwordResetAttemptsDeleted: number;
   refreshTokensDeleted: number;
   totalDeleted: number;
 }
@@ -28,19 +27,15 @@ export class CleanupExpiredEntitiesHandler {
     // Clean up password_reset_tokens (expired tokens)
     const passwordResetTokensDeleted = await this.cleanupPasswordResetTokens(command.dryRun);
 
-    // Clean up password_reset_attempts (older than 7 days)
-    const passwordResetAttemptsDeleted = await this.cleanupPasswordResetAttempts(command.dryRun);
-
     // Clean up refresh_tokens (expired tokens)
     const refreshTokensDeleted = await this.cleanupRefreshTokens(command.dryRun);
 
-    const totalDeleted = passwordResetTokensDeleted + passwordResetAttemptsDeleted + refreshTokensDeleted;
+    const totalDeleted = passwordResetTokensDeleted + refreshTokensDeleted;
 
     this.logger.log(`Cleanup completed. Total deleted: ${totalDeleted}`);
 
     return {
       passwordResetTokensDeleted,
-      passwordResetAttemptsDeleted,
       refreshTokensDeleted,
       totalDeleted,
     };
@@ -60,28 +55,6 @@ export class CleanupExpiredEntitiesHandler {
 
     const deleted = await this.resetTokenRepository.cleanupExpiredTokens();
     this.logger.log(`Deleted ${deleted} expired password_reset_tokens`);
-    return deleted;
-  }
-
-  private async cleanupPasswordResetAttempts(dryRun: boolean): Promise<number> {
-    if (dryRun) {
-      const result = await this.db.query<{ count: string }>(
-        `SELECT COUNT(*) as count
-         FROM password_reset_attempts
-         WHERE attempted_at < NOW() - INTERVAL '7 days'`,
-      );
-      const count = parseInt(result[0]?.count ?? '0', 10);
-      this.logger.log(`[DRY RUN] Would delete ${count} old password_reset_attempts`);
-      return count;
-    }
-
-    const result = await this.db.query<{ id: string }>(
-      `DELETE FROM password_reset_attempts
-       WHERE attempted_at < NOW() - INTERVAL '7 days'`,
-    );
-
-    const deleted = result.length;
-    this.logger.log(`Deleted ${deleted} old password_reset_attempts`);
     return deleted;
   }
 

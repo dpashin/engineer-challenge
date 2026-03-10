@@ -93,7 +93,6 @@ export class CleanupCronService implements OnModuleInit {
     try {
       const result = await this.commandBus.execute<CleanupExpiredEntitiesCommand, {
         passwordResetTokensDeleted: number;
-        passwordResetAttemptsDeleted: number;
         refreshTokensDeleted: number;
         totalDeleted: number;
       }>(new CleanupExpiredEntitiesCommand(false));
@@ -101,7 +100,6 @@ export class CleanupCronService implements OnModuleInit {
       this.logger.log(
         `Cleanup completed successfully. ` +
         `Password reset tokens: ${result.passwordResetTokensDeleted}, ` +
-        `Password reset attempts: ${result.passwordResetAttemptsDeleted}, ` +
         `Refresh tokens: ${result.refreshTokensDeleted}, ` +
         `Total: ${result.totalDeleted}`,
       );

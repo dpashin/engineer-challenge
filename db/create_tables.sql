@@ -65,17 +65,6 @@ CREATE INDEX idx_password_reset_tokens_token_hash ON password_reset_tokens (toke
 CREATE INDEX idx_password_reset_tokens_expires_at ON password_reset_tokens (expires_at);
 CREATE INDEX idx_password_reset_tokens_user_id ON password_reset_tokens (user_id) WHERE used_at IS NULL AND revoked_at IS NULL;
 
--- Password reset attempts tracking: enforces rate limiting (3 attempts, 30 min block)
-CREATE TABLE password_reset_attempts (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-    attempted_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-    success BOOLEAN NOT NULL DEFAULT FALSE
-);
-
--- Index for counting recent
-CREATE INDEX idx_password_reset_attempts_user_time ON password_reset_attempts (user_id, attempted_at);
-
 -- ============================================
 -- Refresh Tokens table (for session management)
 -- ============================================
