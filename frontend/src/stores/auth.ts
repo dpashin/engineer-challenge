@@ -18,20 +18,20 @@ export const useAuthStore = defineStore('auth', () => {
   const tokens = ref<AuthTokens | null>(null);
   const isAuthenticated = computed(() => !!tokens.value && !!user.value);
 
+  /**
+   * Устанавливаем аутентификацию
+   * Токены теперь хранятся в httpOnly cookies, а не в localStorage
+   */
   function setAuth(newUser: User, newTokens: AuthTokens) {
     user.value = newUser;
     tokens.value = newTokens;
-    localStorage.setItem('auth_tokens', JSON.stringify(newTokens));
+    // Токены больше не сохраняем в localStorage - они в httpOnly cookies
     localStorage.setItem('auth_user', JSON.stringify(newUser));
   }
 
   function loadFromStorage() {
-    const storedTokens = localStorage.getItem('auth_tokens');
+    // Токены загружаются автоматически из cookies
     const storedUser = localStorage.getItem('auth_user');
-
-    if (storedTokens) {
-      tokens.value = JSON.parse(storedTokens);
-    }
 
     if (storedUser) {
       user.value = JSON.parse(storedUser);
@@ -48,7 +48,7 @@ export const useAuthStore = defineStore('auth', () => {
   function logout() {
     user.value = null;
     tokens.value = null;
-    localStorage.removeItem('auth_tokens');
+    // Cookies очищаются на сервере при вызове logout мутации
     localStorage.removeItem('auth_user');
   }
 
@@ -56,7 +56,7 @@ export const useAuthStore = defineStore('auth', () => {
     if (tokens.value) {
       tokens.value.accessToken = newAccessToken;
       tokens.value.refreshToken = newRefreshToken;
-      localStorage.setItem('auth_tokens', JSON.stringify(tokens.value));
+      // Токены не сохраняем в localStorage - они в httpOnly cookies
     }
   }
 

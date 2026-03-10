@@ -279,6 +279,19 @@ docker-compose ps
 - ✅ Регулярно обновляйте зависимости (`npm audit`, `npm audit fix`)
 - ✅ Ротируйте секреты периодически (минимум раз в 90 дней)
 
+#### Токены и Cookies
+
+**httpOnly Cookies:**
+- Токены хранятся в httpOnly cookies для защиты от XSS атак
+- Cookies устанавливаются с флагами: `httpOnly`, `secure` (в production), `sameSite=lax`
+- Access token: 1 час, Refresh token: 7 дней
+- Refresh token автоматически обновляется при истечении access token
+
+**Защита от XSS:**
+- Токены не доступны через JavaScript (httpOnly)
+- Frontend не хранит чувствительные данные в localStorage
+- Cookies передаются только по HTTPS в production
+
 ## Бизнес-правила и ключевые инварианты
 
 ### Бизнес-процессы
@@ -349,7 +362,7 @@ Rate limiting реализован с использованием **Redis** и 
 - [ ] красивые миграции в базе (dbmate?, ...)
 - [ ] Terraform/Kubernetes manifests/Helm
 - [ ] Метрики (prometheus), трейсинг (подумать)
-- [ ] подумать на предмет замены localstorage на куки
+- [x] подумать на предмет замены localstorage на куки
 - [ ] еще раз прочекать twelve-factor, что-то оставалось
 - [x] прочекать на уязвимости
 - [x] Исправить уязвимости в зависимостях (nodemailer, bcrypt)

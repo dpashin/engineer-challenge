@@ -1,13 +1,17 @@
 import { NestFactory } from '@nestjs/core';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const logger = new Logger('Bootstrap');
 
-  // Enable CORS for frontend
+  // Cookie parser middleware
+  app.use(cookieParser());
+
+  // Enable CORS for frontend with credentials
   const corsOrigins = process.env.CORS_ORIGIN?.split(',') || ['http://localhost:4200'];
   app.enableCors({
     origin: corsOrigins,

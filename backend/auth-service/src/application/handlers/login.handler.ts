@@ -112,6 +112,8 @@ export class LoginHandler implements ICommandHandler<LoginCommand, LoginResult> 
 
       this.logger.log(`Login successful for: ${email}`);
 
+      // В production токены устанавливаются в httpOnly cookies через response
+      // Для обратной совместимости возвращаем токены в ответе (для старых клиентов)
       return {
         success: true,
         accessToken,

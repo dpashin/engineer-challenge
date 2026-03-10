@@ -13,7 +13,7 @@ export function setAuthStore(store: any) {
 
 const httpLink = createHttpLink({
   uri: import.meta.env.VITE_GRAPHQL_ENDPOINT || 'http://localhost:3000/graphql',
-  credentials: 'include',
+  credentials: 'include', // Отправляем cookies с каждым запросом
 });
 
 // Error handling link for token refresh
@@ -24,7 +24,9 @@ const errorLink = onError(({ graphQLErrors, operation, forward }) => {
       if (
         err.extensions?.['code'] === 'UNAUTHENTICATED' ||
         err.message?.includes('token') ||
-        err.message?.includes('Token')
+        err.message?.includes('Token') ||
+        err.message?.includes('jwt') ||
+        err.message?.includes('JWT')
       ) {
         // Attempt to refresh token
         return new Observable((observer) => {
@@ -45,12 +47,13 @@ async function handleTokenRefresh(
     return;
   }
 
-  const refreshToken = authStore.tokens.refreshToken;
+  // В новой реализации refresh token берётся из cookies автоматически
+  // благодаря credentials: 'include'
+  const refreshToken = authStore.tokens.value?.refreshToken;
 
   if (!refreshToken) {
-    observer.error(new Error('No refresh token available'));
-    authStore.logout();
-    return;
+    // Пробуем выполнить refresh без явного токена - сервер возьмёт из cookies
+    console.log('Attempting token refresh using cookies...');
   }
 
   try {
@@ -63,10 +66,10 @@ async function handleTokenRefresh(
         headers: {
           'Content-Type': 'application/json',
         },
-        credentials: 'include',
+        credentials: 'include', // Отправляем cookies для refresh token
         body: JSON.stringify({
           query: REFRESH_TOKEN,
-          variables: { refreshToken },
+          variables: refreshToken ? { refreshToken } : {},
         }),
       },
     );
@@ -76,7 +79,7 @@ async function handleTokenRefresh(
     if (result.data?.refreshToken?.success) {
       const { accessToken, refreshToken: newRefreshToken } = result.data.refreshToken;
 
-      // Update tokens in store
+      // Update tokens in store (access token для памяти, refresh в cookies)
       authStore.updateTokens(accessToken, newRefreshToken);
 
       // Retry the original operation with new token
@@ -86,7 +89,6 @@ async function handleTokenRefresh(
           ...operation.context,
           headers: {
             ...operation.context?.headers,
-            Authorization: `Bearer ${accessToken}`,
           },
         },
       };

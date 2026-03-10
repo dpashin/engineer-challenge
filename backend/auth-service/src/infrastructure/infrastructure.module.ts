@@ -1,4 +1,4 @@
-import { Module, Global } from '@nestjs/common';
+import { Module, Global, MiddlewareConsumer, NestModule, RequestMethod } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { DatabaseModule } from './database/database.module';
 import { CronModule } from './cron/cron.module';
@@ -10,6 +10,7 @@ import { RefreshTokenRepository } from './repositories/refresh-token.repository'
 import { PasswordHasher } from './services/password-hasher.service';
 import { TokenService } from './services/token.service';
 import { EmailService } from './services/email.service';
+import { CookieMiddleware } from './middleware/cookie.middleware';
 
 @Global()
 @Module({
@@ -21,6 +22,7 @@ import { EmailService } from './services/email.service';
     PasswordHasher,
     TokenService,
     EmailService,
+    CookieMiddleware,
   ],
   exports: [
     DatabaseModule,
@@ -33,4 +35,10 @@ import { EmailService } from './services/email.service';
     RateLimitModule,
   ],
 })
-export class InfrastructureModule {}
+export class InfrastructureModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer
+      .apply(CookieMiddleware)
+      .forRoutes({ path: '*', method: RequestMethod.ALL });
+  }
+}

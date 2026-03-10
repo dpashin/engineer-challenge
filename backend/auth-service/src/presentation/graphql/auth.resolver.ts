@@ -109,6 +109,12 @@ export class AuthResolver {
       };
     }
 
+    // Устанавливаем токены в httpOnly cookies
+    const res = context.res;
+    if (res && res.setAuthCookies) {
+      res.setAuthCookies(result.accessToken, result.refreshToken);
+    }
+
     return {
       success: true,
       accessToken: result.accessToken,
@@ -180,7 +186,7 @@ export class AuthResolver {
   @Mutation(() => RefreshTokenResultType)
   @RateLimit(RateLimitType.TOKEN_REFRESH, 'refreshToken')
   async refreshToken(
-    @Args('refreshToken') refreshToken: string,
+    @Args('refreshToken', { nullable: true }) refreshToken: string | null,
     @Context() context: any,
   ): Promise<RefreshTokenResultType> {
     this.logger.log(`Refresh token mutation called`);
@@ -188,8 +194,24 @@ export class AuthResolver {
     const ipAddress = this.getClientIp(context);
     const userAgent = this.getUserAgent(context);
 
+    // Получаем refresh token из cookies, если не передан в аргументах
+    let tokenToRefresh = refreshToken;
+    if (!tokenToRefresh && context.req?.cookies?.refresh_token) {
+      tokenToRefresh = context.req.cookies.refresh_token;
+    }
+
+    if (!tokenToRefresh) {
+      return {
+        success: false,
+        error: {
+          code: RefreshTokenErrorCode.INVALID_TOKEN,
+          message: 'Refresh token not provided',
+        },
+      };
+    }
+
     const result = await this.commandBus.execute(
-      new RefreshTokenCommand(refreshToken, ipAddress, userAgent),
+      new RefreshTokenCommand(tokenToRefresh, ipAddress, userAgent),
     );
 
     if (!result.success) {
@@ -200,6 +222,12 @@ export class AuthResolver {
           message: this.getRefreshTokenErrorMessage(result.error as RefreshTokenErrorCode),
         },
       };
+    }
+
+    // Устанавливаем новые токены в cookies
+    const res = context.res;
+    if (res && res.setAuthCookies) {
+      res.setAuthCookies(result.accessToken, result.refreshToken);
     }
 
     return {
@@ -218,11 +246,34 @@ export class AuthResolver {
   ): Promise<RevokeTokensResultType> {
     this.logger.log(`Logout mutation called`);
 
-    // If refreshToken is provided, revoke only that token
-    // Otherwise, revoke all tokens for the user (logout from all devices)
+    // Получаем refresh token из cookies, если не передан в аргументах
+    let tokenToRevoke = refreshToken;
+    if (!tokenToRevoke && context.req?.cookies?.refresh_token) {
+      tokenToRevoke = context.req.cookies.refresh_token;
+    }
+
+    // Получаем userId из токена, если не передан
+    let userIdToUse = userId;
+    if (!userIdToUse && context.req?.cookies?.refresh_token) {
+      // Можем извлечь userId из refresh token
+      const tokenService = context.req.app?.get?.('tokenService');
+      if (tokenService) {
+        const payload = await tokenService.verifyRefreshToken(tokenToRevoke);
+        if (payload?.sub) {
+          userIdToUse = payload.sub;
+        }
+      }
+    }
+
     const result = await this.commandBus.execute(
-      new RevokeTokensCommand(userId || '', refreshToken || undefined),
+      new RevokeTokensCommand(userIdToUse || '', tokenToRevoke || undefined),
     );
+
+    // Очищаем cookies
+    const res = context.res;
+    if (res && res.clearAuthCookies) {
+      res.clearAuthCookies();
+    }
 
     return {
       success: result.success,
