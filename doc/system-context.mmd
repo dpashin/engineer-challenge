@@ -26,7 +26,7 @@ stateDiagram-v2
     }
 
     %% Redis
-    state "Redis\n(rate limiting,\nsliding window log)" as Redis
+    state "Redis\n(sliding window log storage)" as Redis
 
     %% Связи
     User --> Frontend: "Вводит данные\n(логин, пароль, email)"

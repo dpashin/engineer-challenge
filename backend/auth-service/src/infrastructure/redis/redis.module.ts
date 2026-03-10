@@ -1,7 +1,5 @@
 import { Module, Global, Logger } from '@nestjs/common';
 import { Redis } from 'ioredis';
-import { RateLimitService } from '../services/rate-limit/rate-limit.service';
-import { RateLimitConfigService, RATE_LIMIT_CONFIG } from '../services/rate-limit/rate-limit.config';
 
 export const REDIS_CLIENT = Symbol('REDIS_CLIENT');
 
@@ -12,7 +10,7 @@ export const REDIS_CLIENT = Symbol('REDIS_CLIENT');
       provide: REDIS_CLIENT,
       useFactory: (): Redis => {
         const logger = new Logger('Redis');
-        
+
         const redis = new Redis({
           host: process.env.REDIS_HOST || 'localhost',
           port: parseInt(process.env.REDIS_PORT || '6379'),
@@ -43,12 +41,7 @@ export const REDIS_CLIENT = Symbol('REDIS_CLIENT');
         return redis;
       },
     },
-    {
-      provide: RATE_LIMIT_CONFIG,
-      useClass: RateLimitConfigService,
-    },
-    RateLimitService,
   ],
-  exports: [REDIS_CLIENT, RATE_LIMIT_CONFIG, RateLimitService],
+  exports: [REDIS_CLIENT],
 })
 export class RedisModule {}

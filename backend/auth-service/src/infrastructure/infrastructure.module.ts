@@ -3,17 +3,17 @@ import { ConfigModule } from '@nestjs/config';
 import { DatabaseModule } from './database/database.module';
 import { CronModule } from './cron/cron.module';
 import { RedisModule } from './redis/redis.module';
+import { RateLimitModule } from './services/rate-limit/rate-limit.module';
 import { UserRepository } from './repositories/user.repository';
 import { ResetTokenRepository } from './repositories/reset-token.repository';
 import { RefreshTokenRepository } from './repositories/refresh-token.repository';
 import { PasswordHasher } from './services/password-hasher.service';
 import { TokenService } from './services/token.service';
 import { EmailService } from './services/email.service';
-import { RateLimitService } from './services/rate-limit/rate-limit.service';
 
 @Global()
 @Module({
-  imports: [ConfigModule, DatabaseModule, CronModule, RedisModule],
+  imports: [ConfigModule, DatabaseModule, CronModule, RedisModule, RateLimitModule],
   providers: [
     UserRepository,
     ResetTokenRepository,
@@ -21,7 +21,6 @@ import { RateLimitService } from './services/rate-limit/rate-limit.service';
     PasswordHasher,
     TokenService,
     EmailService,
-    RateLimitService,
   ],
   exports: [
     DatabaseModule,
@@ -31,7 +30,7 @@ import { RateLimitService } from './services/rate-limit/rate-limit.service';
     PasswordHasher,
     TokenService,
     EmailService,
-    RateLimitService,
+    RateLimitModule,
   ],
 })
 export class InfrastructureModule {}
