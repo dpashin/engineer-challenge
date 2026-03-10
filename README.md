@@ -55,7 +55,7 @@ UI-дизайн (https://www.figma.com/design/31KetUbya482vMSGgyiNIf/Orbitto-%7C
     - [x] expiration
     > [здесь](#токены)
     - [ ] replay/abuse considerations
-    > [здесь](#токены)
+    > [здесь](#refresh-token)
 
 5. Наблюдаемость и качество
 - [x] Логи, метрики или трейсинг (минимум один из блоков).
