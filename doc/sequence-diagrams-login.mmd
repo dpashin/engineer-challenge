@@ -12,6 +12,7 @@ sequenceDiagram
     participant PasswordHasher as Password Hasher
     participant TokenService as Token Service
     participant RefreshTokenRepo as Refresh Token Repository
+    participant DB as PostgreSQL
 
     User->>Frontend: Enter credentials (email, password)
     Frontend->>API: POST /graphql (LoginMutation)
@@ -20,38 +21,40 @@ sequenceDiagram
     %% Rate Limit Check by Email
     Command->>RateLimit: Check Rate Limit (by email)
     RateLimit->>Redis: Check failed attempts (sliding window)
-    Redis-->>RateLimit: Count > limit
     alt Rate limit exceeded (email)
+        Redis-->>RateLimit: Count > limit
         RateLimit-->>Command: ACCOUNT_LOCKED + retryAfter
         Command-->>API: LoginError.ACCOUNT_LOCKED
         API-->>Frontend: Error message
         Frontend-->>User: Account locked (try later)
     else Rate limit OK
+        Redis-->>RateLimit: Allowed
         RateLimit-->>Command: Allowed
 
         %% Rate Limit Check by IP
         Command->>RateLimit: Check Rate Limit (by IP)
         RateLimit->>Redis: Check IP requests
-        Redis-->>RateLimit: Count > limit
         alt Rate limit exceeded (IP)
+            Redis-->>RateLimit: Count > limit
             RateLimit-->>Command: TOO_MANY_REQUESTS + retryAfter
             Command-->>API: LoginError.TOO_MANY_REQUESTS
             API-->>Frontend: Error message
             Frontend-->>User: Too many requests
         else Rate limit OK
+            Redis-->>RateLimit: Allowed
             RateLimit-->>Command: Allowed
 
             %% Find User
             Command->>UserRepo: Find by Email
-            UserRepo->>Redis: Query user
-            Redis-->>UserRepo: No user found
+            UserRepo->>DB: Query user by email
             alt User not found
+                DB-->>UserRepo: No user found
                 UserRepo-->>Command: null
                 Command-->>API: LoginError.USER_NOT_FOUND
                 API-->>Frontend: Error message
                 Frontend-->>User: Login failed
             else User found
-                Redis-->>UserRepo: User data (id, passwordHash, isActive)
+                DB-->>UserRepo: User data (id, passwordHash, isActive)
                 UserRepo-->>Command: User entity
 
                 %% Check Account Status
@@ -66,8 +69,8 @@ sequenceDiagram
                     alt Invalid password
                         PasswordHasher-->>Command: InvalidPasswordError
                         Command->>UserRepo: Record Failed Login
-                        UserRepo->>Redis: Increment failed attempts
-                        Redis-->>UserRepo: Recorded
+                        UserRepo->>DB: Increment failed_login_attempts
+                        DB-->>UserRepo: Recorded
                         UserRepo-->>Command: Done
                         Command-->>API: LoginError.INVALID_PASSWORD
                         API-->>Frontend: Error message
@@ -75,8 +78,8 @@ sequenceDiagram
                     else Valid password
                         PasswordHasher-->>Command: Password verified
                         Command->>UserRepo: Reset Failed Logins
-                        UserRepo->>Redis: Clear failed attempts
-                        Redis-->>UserRepo: Reset done
+                        UserRepo->>DB: Clear failed_login_attempts
+                        DB-->>UserRepo: Reset done
                         UserRepo-->>Command: Done
 
                         %% Generate Tokens
@@ -89,8 +92,8 @@ sequenceDiagram
 
                         %% Save Refresh Token
                         Command->>RefreshTokenRepo: Create(userId, hash, expiresAt, ip, userAgent)
-                        RefreshTokenRepo->>Redis: Store refresh token
-                        Redis-->>RefreshTokenRepo: Stored
+                        RefreshTokenRepo->>DB: Store refresh token
+                        DB-->>RefreshTokenRepo: Stored
                         RefreshTokenRepo-->>Command: Done
 
                         Command-->>API: LoginResult { accessToken, refreshToken, expiresIn }

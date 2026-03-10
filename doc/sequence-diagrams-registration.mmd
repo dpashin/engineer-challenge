@@ -5,24 +5,53 @@ sequenceDiagram
     actor User
     participant Frontend as Frontend
     participant API as GraphQL API
+    participant RateLimit as Rate Limit Service
+    participant Redis as Redis
     participant Command as Command Side
     participant Domain as Domain Model
     participant DB as PostgreSQL
 
     User->>Frontend: Enter registration data
     Frontend->>API: POST /graphql (RegisterMutation)
-    API->>Command: Handle RegisterCommand
-    Command->>Domain: Validate Email Uniqueness
-    Domain->>DB: Query existing email
-    DB-->>Domain: Email not found
-    Command->>Domain: Validate Password Strength
-    Domain->>Domain: Check length >= 8 chars
-    Domain->>Domain: Check uppercase, lowercase, digits, special chars
-    Command->>Domain: Hash Password (bcrypt/argon2)
-    Domain->>DB: CreateUser
-    DB-->>Command: User created
-    Command->>DB: Generate and Store JWT
-    DB-->>Command: Token stored
-    Command-->>API: RegistrationResult
-    API-->>Frontend: Success and JWT
-    Frontend-->>User: Registration complete
+
+    %% Rate Limit Check by Email
+    API->>RateLimit: Check Rate Limit (by email)
+    RateLimit->>Redis: Check registrations (sliding window)
+    alt Rate limit exceeded (email)
+        Redis-->>RateLimit: Count > limit
+        RateLimit-->>API: RATE_LIMITED + retryAfter
+        API-->>Frontend: Error: Too many attempts
+        Frontend-->>User: Try again later
+    else Rate limit OK
+        Redis-->>RateLimit: Allowed
+        RateLimit-->>API: Allowed
+
+        %% Rate Limit Check by IP
+        API->>RateLimit: Check Rate Limit (by IP)
+        RateLimit->>Redis: Check IP requests
+        alt Rate limit exceeded (IP)
+            Redis-->>RateLimit: Count > limit
+            RateLimit-->>API: RATE_LIMITED + retryAfter
+            API-->>Frontend: Error: Too many requests
+            Frontend-->>User: Try again later
+        else Rate limit OK
+            Redis-->>RateLimit: Allowed
+            RateLimit-->>API: Allowed
+
+            API->>Command: Handle RegisterCommand
+
+            Command->>Domain: Validate Email Uniqueness
+            Domain->>DB: Query existing email
+            DB-->>Domain: Email not found
+            Command->>Domain: Validate Password Strength
+            Domain->>Domain: Check length >= 8 chars
+            Domain->>Domain: Check uppercase, lowercase, digits, special chars
+            Command->>Domain: Hash Password (bcrypt)
+            Domain->>DB: CreateUser
+            DB-->>Command: User created
+            Command->>Domain: Generate Access Token (JWT)
+            Command-->>API: RegistrationResult
+            API-->>Frontend: Success + JWT
+            Frontend-->>User: Registration complete
+        end
+    end
