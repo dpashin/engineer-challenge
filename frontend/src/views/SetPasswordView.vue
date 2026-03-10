@@ -54,7 +54,6 @@ const errors = ref<{ password: string; passwordConfirm: string }>({
   passwordConfirm: '',
 });
 const isLoading = ref(false);
-const generalError = ref('');
 
 const { mutate: resetPasswordMutation } = useMutation(RESET_PASSWORD);
 
@@ -94,12 +93,10 @@ async function handleSubmit() {
   }
 
   isLoading.value = true;
-  generalError.value = '';
 
   const token = route.query.token as string;
 
   if (!token) {
-    generalError.value = 'Отсутствует токен восстановления';
     isLoading.value = false;
     return;
   }
@@ -115,8 +112,6 @@ async function handleSubmit() {
     } else {
       const error = result?.data?.resetPassword.error;
       if (error) {
-        generalError.value = error.message || 'Ошибка сброса пароля';
-        
         if (error.code === 'INVALID_TOKEN') {
           router.push('/password-error');
         } else if (error.code === 'TOKEN_EXPIRED') {
@@ -130,7 +125,6 @@ async function handleSubmit() {
     }
   } catch (error) {
     console.error('Reset password error:', error);
-    generalError.value = 'Ошибка подключения к серверу';
   } finally {
     isLoading.value = false;
   }

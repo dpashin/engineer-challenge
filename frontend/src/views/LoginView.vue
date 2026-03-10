@@ -62,7 +62,6 @@ const email = ref('');
 const password = ref('');
 const errors = ref<{ email: string; password: string }>({ email: '', password: '' });
 const isLoading = ref(false);
-const generalError = ref('');
 
 const { mutate: loginMutation } = useMutation(LOGIN);
 
@@ -100,7 +99,6 @@ async function handleSubmit() {
   }
 
   isLoading.value = true;
-  generalError.value = '';
 
   try {
     const result = await loginMutation({
@@ -110,7 +108,7 @@ async function handleSubmit() {
 
     if (result?.data?.login.success) {
       const { accessToken, refreshToken, expiresIn } = result.data.login;
-      
+
       authStore.setAuth(
         { id: '', email: email.value.trim() },
         { accessToken, refreshToken, expiresIn: expiresIn || 3600 }
@@ -120,8 +118,6 @@ async function handleSubmit() {
     } else {
       const error = result?.data?.login.error;
       if (error) {
-        generalError.value = error.message || 'Ошибка входа';
-        
         if (error.code === 'USER_NOT_FOUND' || error.code === 'INVALID_PASSWORD') {
           errors.value.password = error.message;
         } else if (error.code === 'ACCOUNT_LOCKED') {
@@ -131,7 +127,6 @@ async function handleSubmit() {
     }
   } catch (error) {
     console.error('Login error:', error);
-    generalError.value = 'Ошибка подключения к серверу';
   } finally {
     isLoading.value = false;
   }

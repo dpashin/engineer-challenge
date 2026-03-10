@@ -158,29 +158,6 @@ export class RateLimitService {
     };
   }
 
-  /**
-   * Reset limit for a key
-   */
-  async resetLimit(key: string): Promise<void> {
-    await this.redis.del(key);
-    this.logger.debug(`Rate limit reset for key: ${key}`);
-  }
-
-  /**
-   * Reset limit by type and identifier
-   */
-  async resetLimitByType(type: RateLimitType, identifier: string): Promise<void> {
-    const key = this.buildKey(type, identifier);
-    await this.resetLimit(key);
-  }
-
-  /**
-   * Close Redis connection
-   */
-  async shutdown(): Promise<void> {
-    await this.redis.quit();
-    this.logger.log('Redis connection closed');
-  }
 }
 
 /**

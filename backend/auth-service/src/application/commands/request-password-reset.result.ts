@@ -5,7 +5,6 @@ export interface RequestPasswordResetResult {
 }
 
 export enum RequestPasswordResetError {
-  USER_NOT_FOUND = 'USER_NOT_FOUND',
   RATE_LIMITED = 'RATE_LIMITED',
   INTERNAL_ERROR = 'INTERNAL_ERROR',
 }

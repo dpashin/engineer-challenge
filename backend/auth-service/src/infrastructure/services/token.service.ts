@@ -102,11 +102,4 @@ export class TokenService {
   getAccessTokenExpiresIn(): number {
     return this.accessTokenExpiresIn;
   }
-
-  /**
-   * Get refresh token expiration time in seconds
-   */
-  getRefreshTokenExpiresIn(): number {
-    return this.refreshTokenExpiresIn;
-  }
 }

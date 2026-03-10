@@ -37,17 +37,8 @@ export class DatabaseService {
     this.logger.log(`Database pool initialized: ${host}:${port}/${database}`);
   }
 
-  async getConnection(): Promise<PoolClient> {
-    return this.pool.connect();
-  }
-
   async query<T = any>(text: string, params?: any[]): Promise<T[]> {
     const result = await this.pool.query(text, params);
     return result.rows;
-  }
-
-  async close(): Promise<void> {
-    await this.pool.end();
-    this.logger.log('Database pool closed');
   }
 }

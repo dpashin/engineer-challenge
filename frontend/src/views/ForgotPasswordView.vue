@@ -51,7 +51,6 @@ const router = useRouter();
 const email = ref('');
 const errors = ref<{ email: string }>({ email: '' });
 const isLoading = ref(false);
-const generalError = ref('');
 
 const { mutate: requestPasswordResetMutation } = useMutation(REQUEST_PASSWORD_RESET);
 
@@ -80,7 +79,6 @@ async function handleSubmit() {
   }
 
   isLoading.value = true;
-  generalError.value = '';
 
   try {
     const result = await requestPasswordResetMutation({
@@ -92,8 +90,6 @@ async function handleSubmit() {
     } else {
       const error = result?.data?.requestPasswordReset.error;
       if (error) {
-        generalError.value = error.message || 'Ошибка отправки письма';
-        
         if (error.code === 'RATE_LIMITED') {
           errors.value.email = error.message;
         }
@@ -101,7 +97,6 @@ async function handleSubmit() {
     }
   } catch (error) {
     console.error('Request password reset error:', error);
-    generalError.value = 'Ошибка подключения к серверу';
   } finally {
     isLoading.value = false;
   }

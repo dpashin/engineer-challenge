@@ -74,7 +74,6 @@ const errors = ref<{ email: string; password: string; passwordConfirm: string }>
   passwordConfirm: '',
 });
 const isLoading = ref(false);
-const generalError = ref('');
 
 const { mutate: registerMutation } = useMutation(REGISTER);
 
@@ -123,7 +122,6 @@ async function handleSubmit() {
   }
 
   isLoading.value = true;
-  generalError.value = '';
 
   try {
     const result = await registerMutation({
@@ -136,8 +134,6 @@ async function handleSubmit() {
     } else {
       const error = result?.data?.register.error;
       if (error) {
-        generalError.value = error.message || 'Ошибка регистрации';
-        
         if (error.code === 'EMAIL_ALREADY_EXISTS') {
           errors.value.email = error.message;
         } else if (error.code === 'INVALID_PASSWORD') {
@@ -147,7 +143,6 @@ async function handleSubmit() {
     }
   } catch (error) {
     console.error('Register error:', error);
-    generalError.value = 'Ошибка подключения к серверу';
   } finally {
     isLoading.value = false;
   }

@@ -10,26 +10,13 @@ export class RateLimitExceededException extends HttpException {
       message,
       error: 'Too Many Requests',
     };
-    
+
     if (retryAfter) {
       response.retryAfter = retryAfter;
     }
-    
+
     super(response, HttpStatus.TOO_MANY_REQUESTS, {
       cause: 'RATE_LIMIT_EXCEEDED',
     });
-  }
-}
-
-export class RateLimitValidationError extends HttpException {
-  constructor(message: string) {
-    super(
-      {
-        statusCode: HttpStatus.BAD_REQUEST,
-        message,
-        error: 'Bad Request',
-      },
-      HttpStatus.BAD_REQUEST,
-    );
   }
 }
