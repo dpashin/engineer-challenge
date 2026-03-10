@@ -319,6 +319,7 @@ docker-compose ps
   - Database constraint: UNIQUE INDEX on `jti` prevents duplicate usage
   - Fingerprint validation: IP address and User Agent are compared with original session
   - Concurrent request handling: Second simultaneous request is rejected as replay attack
+  - **Token Reuse Detection**: If a refresh token is used twice, ALL user sessions are revoked immediately
 
 #### Password Reset Token
 - Expiration: 10 minutes (hardcoded in ResetTokenPolicyService)
@@ -361,16 +362,12 @@ Rate limiting реализован с использованием **Redis** и 
 
 - [ ] красивые миграции в базе (dbmate?, ...)
 - [ ] Terraform/Kubernetes manifests/Helm
-- [ ] Метрики (prometheus), трейсинг (подумать)
-- [x] подумать на предмет замены localstorage на куки
+- [ ] Добавить HTTPS в production (Let's Encrypt / reverse proxy)
+- [ ] Настроить CSP (Content Security Policy) headers
+- [ ] Добавить метрики и трейсинг
 - [ ] еще раз прочекать twelve-factor, что-то оставалось
-- [x] прочекать на уязвимости
-- [x] Исправить уязвимости в зависимостях (nodemailer, bcrypt)
-- [x] Удалить hardcoded секреты из docker-compose.yml
+- [x] Replay attack protection (token reuse detection)
 - [ ] Посчитать покрытие юнит-тестами
-- [ ] Логин - валидация пароля сообщение на английском
 - [ ] Проверить, как бэк отдает health статус
 - [ ] hot rebuild для дев среды
-
-
 

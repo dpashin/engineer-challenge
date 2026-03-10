@@ -94,14 +94,21 @@ export class RefreshTokenRepository {
     );
   }
 
-  async revokeAllUserTokens(userId: string): Promise<void> {
-    await this.db.query(
+  /**
+   * Revoke all active refresh tokens for a user
+   * Returns the number of tokens revoked
+   */
+  async revokeAllUserTokens(userId: string): Promise<number> {
+    const result = await this.db.query(
       `UPDATE refresh_tokens
        SET revoked_at = NOW()
        WHERE user_id = $1
-         AND revoked_at IS NULL`,
+         AND revoked_at IS NULL
+       RETURNING id`,
       [userId],
     );
+
+    return result.length;
   }
 
   async recordUsage(tokenId: string): Promise<void> {

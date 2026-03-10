@@ -97,6 +97,26 @@ export class RefreshTokenHandler implements ICommandHandler<RefreshTokenCommand,
         };
       }
 
+      // 🔒 REPLAY ATTACK DETECTION: Check if token was already used
+      if (storedToken.lastUsedAt !== null) {
+        this.logger.error(
+          `🚨 REPLAY ATTACK DETECTED: Token reused for user: ${userId}. ` +
+          `Previous use: ${storedToken.lastUsedAt.toISOString()}. ` +
+          `Revoking ALL user sessions.`
+        );
+        
+        // Revoke ALL user tokens immediately to prevent further abuse
+        const revokedCount = await this.refreshTokenRepository.revokeAllUserTokens(userId);
+        this.logger.warn(
+          `Revoked ${revokedCount} session(s) for user ${userId} due to replay attack`
+        );
+        
+        return {
+          success: false,
+          error: RefreshTokenError.TOKEN_REVOKED,
+        };
+      }
+
       // Check if user exists and is active
       const user = await this.userRepository.findById(userId);
       if (!user || !user.isActive) {
@@ -134,6 +154,9 @@ export class RefreshTokenHandler implements ICommandHandler<RefreshTokenCommand,
         ipAddress,
         userAgent,
       );
+
+      // Record usage of the old token (mark as used)
+      await this.refreshTokenRepository.recordUsage(storedToken.id);
 
       this.logger.log(`Token refreshed successfully for user: ${userId}`);
 
