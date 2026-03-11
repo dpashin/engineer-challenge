@@ -364,15 +364,15 @@ Rate limiting реализован с использованием **Redis** и 
 
 ## TODO
 
-- [ ] красивые миграции в базе (dbmate?, ...)
+- [ ] частичное дублирование основного readme и в backend/auth-service
 - [ ] Terraform/Kubernetes manifests/Helm
-- [ ] Добавить HTTPS в production (Let's Encrypt / reverse proxy)
+- [ ] красивые миграции в базе (dbmate?, ...)
 - [ ] Настроить CSP (Content Security Policy) headers
 - [ ] Добавить метрики и трейсинг
+- [ ] Добавить HTTPS в production (Let's Encrypt / reverse proxy)
 - [ ] еще раз прочекать twelve-factor, что-то оставалось
-- [ ] частичное дублирование основного readme и в backend/auth-service
+  - [ ] Переделать логи в json
 - [ ] Улучшить покрытие юнит-тестами
-- [ ] Переделать логи в json
 - [ ] Проверить, как бэк отдает health статус
 - [ ] hot rebuild для дев среды
 
