@@ -1,13 +1,16 @@
 %% Login Process
 %% File: sequence-diagrams-login.mmd
+%% Updated: 2026-03-11
+%% Changes: Added AccountLockoutService, Progressive Delays, fixed Rate Limit location
 sequenceDiagram
     autonumber
     actor User
     participant Frontend as Frontend
     participant API as GraphQL API
-    participant Command as Command Side
-    participant RateLimit as Rate Limit Service
+    participant RateLimit as Rate Limit Interceptor
     participant Redis as Redis
+    participant Command as Command Handler
+    participant Lockout as AccountLockoutService
     participant UserRepo as User Repository
     participant PasswordHasher as Password Hasher
     participant TokenService as Token Service
@@ -16,88 +19,105 @@ sequenceDiagram
 
     User->>Frontend: Enter credentials (email, password)
     Frontend->>API: POST /graphql (LoginMutation)
-    API->>Command: Handle LoginCommand
-
-    %% Rate Limit Check by Email
-    Command->>RateLimit: Check Rate Limit (by email)
+    
+    %% Rate Limit Check by Email (in Presentation Layer)
+    API->>RateLimit: Intercept request
+    RateLimit->>RateLimit: Check @RateLimit(LOGIN_BY_EMAIL, 'email')
     RateLimit->>Redis: Check failed attempts (sliding window)
     alt Rate limit exceeded (email)
         Redis-->>RateLimit: Count > limit
-        RateLimit-->>Command: ACCOUNT_LOCKED + retryAfter
-        Command-->>API: LoginError.ACCOUNT_LOCKED
-        API-->>Frontend: Error message
+        RateLimit-->>API: Throw RateLimitExceededException
+        API-->>Frontend: Error: ACCOUNT_LOCKED + retryAfter
         Frontend-->>User: Account locked (try later)
     else Rate limit OK
         Redis-->>RateLimit: Allowed
-        RateLimit-->>Command: Allowed
-
-        %% Rate Limit Check by IP
-        Command->>RateLimit: Check Rate Limit (by IP)
+        RateLimit->>RateLimit: Check @RateLimit(LOGIN_BY_IP, 'ipAddress')
         RateLimit->>Redis: Check IP requests
         alt Rate limit exceeded (IP)
             Redis-->>RateLimit: Count > limit
-            RateLimit-->>Command: TOO_MANY_REQUESTS + retryAfter
-            Command-->>API: LoginError.TOO_MANY_REQUESTS
-            API-->>Frontend: Error message
+            RateLimit-->>API: Throw RateLimitExceededException
+            API-->>Frontend: Error: TOO_MANY_REQUESTS + retryAfter
             Frontend-->>User: Too many requests
         else Rate limit OK
             Redis-->>RateLimit: Allowed
-            RateLimit-->>Command: Allowed
+            RateLimit->>Command: Execute LoginCommand
 
             %% Find User
-            Command->>UserRepo: Find by Email
-            UserRepo->>DB: Query user by email
+            Command->>UserRepo: findByEmail(email)
+            UserRepo->>DB: SELECT * FROM users WHERE email = ?
             alt User not found
                 DB-->>UserRepo: No user found
                 UserRepo-->>Command: null
+                note over Command: Apply fake delay to prevent<br/>email enumeration
+                Command->>Command: Apply 1s delay
                 Command-->>API: LoginError.USER_NOT_FOUND
                 API-->>Frontend: Error message
-                Frontend-->>User: Login failed
+                Frontend-->>User: Invalid credentials
             else User found
-                DB-->>UserRepo: User data (id, passwordHash, isActive)
+                DB-->>UserRepo: User data (id, passwordHash, isActive, lockedUntil, failedLoginAttempts)
                 UserRepo-->>Command: User entity
 
-                %% Check Account Status
-                alt Account is locked (!isActive)
-                    Command-->>API: LoginError.ACCOUNT_LOCKED
+                %% Check Account Lockout Status
+                Command->>Lockout: checkLockoutStatus(userId, failedAttempts, lockedUntil)
+                alt Account is locked
+                    Lockout-->>Command: isLocked=true, remainingLockoutSeconds
+                    Command-->>API: LoginError.ACCOUNT_LOCKED + retryAfter
                     API-->>Frontend: Error message
                     Frontend-->>User: Account locked
                 else Account is active
+                    Lockout-->>Command: isLocked=false
                     %% Verify Password
-                    Command->>PasswordHasher: Compare(password, passwordHash)
+                    Command->>PasswordHasher: compare(password, passwordHash)
                     PasswordHasher-->>Command: false
                     alt Invalid password
                         PasswordHasher-->>Command: InvalidPasswordError
-                        Command->>UserRepo: Record Failed Login
-                        UserRepo->>DB: Increment failed_login_attempts
-                        DB-->>UserRepo: Recorded
-                        UserRepo-->>Command: Done
-                        Command-->>API: LoginError.INVALID_PASSWORD
+                        Command->>Lockout: handleFailedLogin(userId, email)
+                        Lockout->>UserRepo: recordFailedLogin(userId)
+                        UserRepo->>DB: UPDATE users SET failed_login_attempts++
+                        DB-->>UserRepo: Updated
+                        Lockout->>Lockout: Check if lockout threshold reached
+                        alt Lockout threshold reached (5 attempts)
+                            Lockout->>UserRepo: lockAccount(userId, lockedUntil)
+                            UserRepo->>DB: UPDATE users SET locked_until = ?
+                            DB-->>UserRepo: Locked
+                            Lockout-->>Command: isLocked=true, remainingLockoutSeconds
+                        else Below threshold
+                            Lockout->>Lockout: Calculate progressive delay
+                            note over Lockout: 3 attempts = 2s<br/>4 attempts = 5s<br/>5 attempts = 10s
+                            Lockout-->>Command: shouldApplyDelay=true, delayMs
+                        end
+                        alt Progressive delay required
+                            Command->>Command: Apply progressive delay
+                            note over Command: Blocking wait
+                        end
+                        Command-->>API: LoginError.INVALID_PASSWORD + retryAfter/lockout info
                         API-->>Frontend: Error message
                         Frontend-->>User: Invalid credentials
                     else Valid password
                         PasswordHasher-->>Command: Password verified
-                        Command->>UserRepo: Reset Failed Logins
-                        UserRepo->>DB: Clear failed_login_attempts
+                        Command->>Lockout: handleSuccessfulLogin(userId, email)
+                        Lockout->>UserRepo: resetFailedLogins(userId)
+                        UserRepo->>DB: UPDATE users SET failed_login_attempts=0, locked_until=NULL
                         DB-->>UserRepo: Reset done
-                        UserRepo-->>Command: Done
+                        Lockout-->>Command: Done
 
                         %% Generate Tokens
-                        Command->>TokenService: Generate Access Token
-                        TokenService-->>Command: JWT accessToken
-                        Command->>TokenService: Generate Refresh Token
-                        TokenService-->>Command: refreshToken + expiresAt
-                        Command->>TokenService: Hash Refresh Token
+                        Command->>TokenService: generateAccessToken(userId, email)
+                        TokenService-->>Command: JWT accessToken (exp: 1h)
+                        Command->>TokenService: generateRefreshToken(userId)
+                        TokenService-->>Command: refreshToken + expiresAt + jti
+                        Command->>TokenService: hashToken(refreshToken)
                         TokenService-->>Command: refreshTokenHash
 
                         %% Save Refresh Token
-                        Command->>RefreshTokenRepo: Create(userId, hash, expiresAt, ip, userAgent)
-                        RefreshTokenRepo->>DB: Store refresh token
+                        Command->>RefreshTokenRepo: create(userId, hash, jti, expiresAt, ip, userAgent)
+                        RefreshTokenRepo->>DB: INSERT INTO refresh_tokens (...)
                         DB-->>RefreshTokenRepo: Stored
                         RefreshTokenRepo-->>Command: Done
 
                         Command-->>API: LoginResult { accessToken, refreshToken, expiresIn }
-                        API-->>Frontend: Success + JWT tokens
+                        API->>API: Set httpOnly cookies (accessToken, refreshToken)
+                        API-->>Frontend: Success + JWT tokens (for backward compatibility)
                         Frontend-->>User: Login successful
                     end
                 end

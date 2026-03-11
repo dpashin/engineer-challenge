@@ -1,57 +1,95 @@
 %% Registration Process
 %% File: sequence-diagrams-registration.mmd
+%% Updated: 2026-03-11
+%% Changes: Removed JWT generation (not done in code), fixed Rate Limit location (Presentation layer)
 sequenceDiagram
     autonumber
     actor User
     participant Frontend as Frontend
     participant API as GraphQL API
-    participant RateLimit as Rate Limit Service
+    participant RateLimit as Rate Limit Interceptor
     participant Redis as Redis
-    participant Command as Command Side
-    participant Domain as Domain Model
+    participant Command as Command Handler
+    participant PasswordPolicy as PasswordPolicyService
+    participant UserRepo as User Repository
+    participant PasswordHasher as Password Hasher
     participant DB as PostgreSQL
 
-    User->>Frontend: Enter registration data
+    User->>Frontend: Enter registration data (email, password)
     Frontend->>API: POST /graphql (RegisterMutation)
 
-    %% Rate Limit Check by Email
-    API->>RateLimit: Check Rate Limit (by email)
+    %% Rate Limit Check by Email (in Presentation Layer)
+    API->>RateLimit: Intercept request
+    RateLimit->>RateLimit: Check @RateLimit(REGISTER_BY_EMAIL, 'email')
     RateLimit->>Redis: Check registrations (sliding window)
     alt Rate limit exceeded (email)
         Redis-->>RateLimit: Count > limit
-        RateLimit-->>API: RATE_LIMITED + retryAfter
-        API-->>Frontend: Error: Too many attempts
-        Frontend-->>User: Try again later
+        RateLimit-->>API: Throw RateLimitExceededException
+        API-->>Frontend: Error: RATE_LIMITED + retryAfter
+        Frontend-->>User: Too many attempts. Try again later
     else Rate limit OK
         Redis-->>RateLimit: Allowed
-        RateLimit-->>API: Allowed
-
-        %% Rate Limit Check by IP
-        API->>RateLimit: Check Rate Limit (by IP)
+        RateLimit->>RateLimit: Check @RateLimit(REGISTER_BY_IP, 'ipAddress')
         RateLimit->>Redis: Check IP requests
         alt Rate limit exceeded (IP)
             Redis-->>RateLimit: Count > limit
-            RateLimit-->>API: RATE_LIMITED + retryAfter
-            API-->>Frontend: Error: Too many requests
-            Frontend-->>User: Try again later
+            RateLimit-->>API: Throw RateLimitExceededException
+            API-->>Frontend: Error: RATE_LIMITED + retryAfter
+            Frontend-->>User: Too many requests. Try again later
         else Rate limit OK
             Redis-->>RateLimit: Allowed
-            RateLimit-->>API: Allowed
+            RateLimit->>Command: Execute RegisterCommand
 
-            API->>Command: Handle RegisterCommand
+            %% Validate Password Policy
+            Command->>PasswordPolicy: validate(password)
+            PasswordPolicy->>PasswordPolicy: Check length >= 8 chars
+            PasswordPolicy->>PasswordPolicy: Check uppercase (A-Z)
+            PasswordPolicy->>PasswordPolicy: Check lowercase (a-z)
+            PasswordPolicy->>PasswordPolicy: Check digits (0-9)
+            PasswordPolicy->>PasswordPolicy: Check special chars (!@#$%^&*)
+            alt Password validation failed
+                PasswordPolicy-->>Command: isValid=false, violations[]
+                Command-->>API: RegisterError.INVALID_PASSWORD
+                API-->>Frontend: Error: Password requirements not met
+                Frontend-->>User: Password too weak
+            else Password validation passed
+                PasswordPolicy-->>Command: isValid=true
 
-            Command->>Domain: Validate Email Uniqueness
-            Domain->>DB: Query existing email
-            DB-->>Domain: Email not found
-            Command->>Domain: Validate Password Strength
-            Domain->>Domain: Check length >= 8 chars
-            Domain->>Domain: Check uppercase, lowercase, digits, special chars
-            Command->>Domain: Hash Password (bcrypt)
-            Domain->>DB: CreateUser
-            DB-->>Command: User created
-            Command->>Domain: Generate Access Token (JWT)
-            Command-->>API: RegistrationResult
-            API-->>Frontend: Success + JWT
-            Frontend-->>User: Registration complete
+                %% Check Email Uniqueness
+                Command->>UserRepo: findByEmail(email)
+                UserRepo->>DB: SELECT * FROM users WHERE email = ?
+                alt Email already exists
+                    DB-->>UserRepo: User found
+                    UserRepo-->>Command: User entity
+                    Command-->>API: RegisterError.EMAIL_ALREADY_EXISTS
+                    API-->>Frontend: Error: Email already registered
+                    Frontend-->>User: Email already in use
+                else Email available
+                    DB-->>UserRepo: No user found
+                    UserRepo-->>Command: null
+
+                    %% Hash Password
+                    Command->>PasswordHasher: hash(password)
+                    PasswordHasher->>PasswordHasher: bcrypt.hash(password, saltRounds=12)
+                    PasswordHasher-->>Command: passwordHash
+
+                    %% Create User
+                    Command->>UserRepo: create(email, passwordHash)
+                    UserRepo->>DB: INSERT INTO users (id, email, password_hash, ...)
+                    DB-->>UserRepo: User created
+                    UserRepo-->>Command: User entity (id, email, createdAt)
+
+                    Command-->>API: RegisterResult { success: true, userId, email }
+                    note over API: No JWT tokens generated<br/>User must login separately
+                    API-->>Frontend: Success (userId, email)
+                    Frontend-->>User: Registration complete
+                end
+            end
         end
     end
+
+    %% Error Handling
+    note over Command: catch (error)
+    Command-->>API: RegisterError.INTERNAL_ERROR
+    API-->>Frontend: Error message
+    Frontend-->>User: Registration failed

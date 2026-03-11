@@ -1,70 +1,85 @@
 %% Password Recovery Process
 %% File: sequence-diagrams-recovery.mmd
+%% Updated: 2026-03-11
+%% Changes: Fixed Rate Limit location (Presentation layer), clarified token handling
 sequenceDiagram
     autonumber
     actor User
     participant Frontend as Frontend
     participant API as GraphQL API
-    participant RateLimit as Rate Limit Service
+    participant RateLimit as Rate Limit Interceptor
     participant Redis as Redis
-    participant Command as Command Side
-    participant Domain as Domain Model
+    participant Command as Command Handler
+    participant ResetTokenPolicy as ResetTokenPolicyService
     participant UserRepo as User Repository
     participant ResetTokenRepo as Reset Token Repository
     participant EmailService as Email Service
+    participant SMTP as SMTP Server
     participant DB as PostgreSQL
 
-    User->>Frontend: Click Forgot Password
+    %% === Request Password Reset ===
+    User->>Frontend: Click Forgot Password, enter email
     Frontend->>API: POST /graphql (RequestPasswordResetMutation)
-    API->>Command: Handle RequestPasswordResetCommand
-
-    %% Rate Limit Check by Email
-    Command->>RateLimit: Check Rate Limit (by email)
+    
+    %% Rate Limit Check (in Presentation Layer)
+    API->>RateLimit: Intercept request
+    RateLimit->>RateLimit: Check @RateLimit(PASSWORD_RESET_BY_EMAIL, 'email')
     RateLimit->>Redis: Check password reset requests (sliding window)
     alt Rate limit exceeded
         Redis-->>RateLimit: Count > limit
-        RateLimit-->>Command: RATE_LIMITED + retryAfter
-        Command-->>API: RequestPasswordResetError.RATE_LIMITED
-        API-->>Frontend: Try again in 30 min
-        Frontend-->>User: Too many attempts
+        RateLimit-->>API: Throw RateLimitExceededException
+        API-->>Frontend: Error: RATE_LIMITED + retryAfter (30 min)
+        Frontend-->>User: Too many attempts. Try again later
     else Rate limit OK
         Redis-->>RateLimit: Allowed
-        RateLimit-->>Command: Allowed
+        RateLimit->>Command: Execute RequestPasswordResetCommand
 
-        Command->>UserRepo: Find User by Email
-        UserRepo->>DB: Query user by email
+        Command->>UserRepo: findByEmail(email)
+        UserRepo->>DB: SELECT * FROM users WHERE email = ?
         alt User not found
             DB-->>UserRepo: No user found
             UserRepo-->>Command: null
-            note over Command: Return success to prevent email enumeration
+            note over Command: Return success to prevent<br/>email enumeration attack
             Command-->>API: Success (no email sent)
             API-->>Frontend: Success
-            Frontend-->>User: Check your email
+            Frontend-->>User: Check your email (if exists)
         else User found
-            DB-->>UserRepo: User data
+            DB-->>UserRepo: User data (id, resetRequestBlockedUntil, failedResetAttempts)
             UserRepo-->>Command: User entity
 
-            %% Check if user is blocked
-            alt User is blocked (reset_request_blocked_until)
+            %% Check if user is blocked from reset requests
+            alt User is blocked (resetRequestBlockedUntil > now)
                 Command-->>API: RequestPasswordResetError.RATE_LIMITED
-                API-->>Frontend: Blocked
+                API-->>Frontend: Error: Blocked
                 Frontend-->>User: Try again later
             else User is not blocked
-                Command->>ResetTokenRepo: Invalidate all existing tokens
-                ResetTokenRepo->>DB: Revoke previous tokens
+                %% Invalidate all existing reset tokens for this user
+                Command->>ResetTokenRepo: invalidateAllUserTokens(userId)
+                ResetTokenRepo->>DB: UPDATE password_reset_tokens SET revoked_at = NOW() WHERE user_id = ?
                 DB-->>ResetTokenRepo: Done
                 ResetTokenRepo-->>Command: Done
 
-                Command->>Domain: Generate Crypto-Secure Reset Token
-                Domain->>Domain: Generate 128+ bit entropy token
-                Command->>Domain: Hash Reset Token (SHA-256)
-                Command->>ResetTokenRepo: Store Token Hash + Expiration (10 min)
-                ResetTokenRepo->>DB: Store token
+                %% Generate crypto-secure reset token
+                Command->>ResetTokenPolicy: getTokenExpirationDate()
+                ResetTokenPolicy->>ResetTokenPolicy: now + 10 minutes
+                ResetTokenPolicy-->>Command: expiresAt
+
+                Command->>Command: Generate secure random token (128+ bit entropy)
+                Command->>Command: Hash token with SHA-256
+                note over Command: Store hash, not raw token<br/>for security
+
+                Command->>ResetTokenRepo: create(userId, tokenHash, expiresAt)
+                ResetTokenRepo->>DB: INSERT INTO password_reset_tokens (user_id, token_hash, expires_at)
                 DB-->>ResetTokenRepo: Token stored
                 ResetTokenRepo-->>Command: Done
 
-                Command->>EmailService: Send password reset email
-                EmailService-->>Command: Email sent
+                %% Send password reset email
+                Command->>EmailService: sendPasswordResetEmail(user.email, rawToken)
+                EmailService->>SMTP: Send email with reset link
+                SMTP-->>EmailService: Email sent
+                EmailService-->>Command: Done
+
+                note over API: Token NOT returned in API response<br/>Sent only via email
                 Command-->>API: Success
                 API-->>Frontend: Success
                 Frontend-->>User: Check your email
@@ -73,65 +88,70 @@ sequenceDiagram
     end
 
     %% === Reset Password with Token ===
-    User->>Frontend: Enter reset token from email
+    User->>Frontend: Enter reset token from email + new password
     Frontend->>API: POST /graphql (ResetPasswordMutation)
-    API->>Command: Handle ResetPasswordCommand
+    API->>Command: Execute ResetPasswordCommand
 
-    Command->>Domain: Hash Submitted Token (SHA-256)
-    Command->>ResetTokenRepo: Find token by hash
-    ResetTokenRepo->>DB: Query token hash and expiration
+    Command->>Command: Hash submitted token (SHA-256)
+    Command->>ResetTokenRepo: findByToken(tokenHash)
+    ResetTokenRepo->>DB: SELECT * FROM password_reset_tokens WHERE token_hash = ?
     alt Token invalid or not found
         DB-->>ResetTokenRepo: No token found
         ResetTokenRepo-->>Command: null
         Command-->>API: ResetPasswordError.INVALID_TOKEN
-        API-->>Frontend: Error message
+        API-->>Frontend: Error: Invalid token
         Frontend-->>User: Invalid or expired token
     else Token found
-        DB-->>ResetTokenRepo: Token data
+        DB-->>ResetTokenRepo: Token data (id, user_id, expires_at, used_at, revoked_at)
         ResetTokenRepo-->>Command: Token entity
 
-        alt Token expired
+        alt Token expired (expiresAt < now)
             Command-->>API: ResetPasswordError.TOKEN_EXPIRED
-            API-->>Frontend: Error message
-            Frontend-->>User: Token expired
-        else Token used
+            API-->>Frontend: Error: Token expired
+            Frontend-->>User: Token has expired
+        else Token already used (usedAt != null)
             Command-->>API: ResetPasswordError.TOKEN_ALREADY_USED
-            API-->>Frontend: Error message
+            API-->>Frontend: Error: Token used
             Frontend-->>User: Token already used
-        else Token revoked
+        else Token revoked (revokedAt != null)
             Command-->>API: ResetPasswordError.INVALID_TOKEN
-            API-->>Frontend: Error message
+            API-->>Frontend: Error: Token revoked
             Frontend-->>User: Token revoked
         else Token valid
-            Command->>Domain: Validate Password Strength
-            Domain->>Domain: Check length >= 8 chars
-            Domain->>Domain: Check uppercase, lowercase, digits, special chars
+            %% Validate new password
+            Command->>Command: validatePassword(newPassword)
+            Command->>Command: Check length >= 8 chars
+            Command->>Command: Check uppercase, lowercase, digits, special chars
             alt Password weak
-                Domain-->>Command: WeakPasswordError
                 Command-->>API: ResetPasswordError.INVALID_PASSWORD
-                API-->>Frontend: Error message
-                Frontend-->>User: Password requirements not met
+                API-->>Frontend: Error: Password requirements not met
+                Frontend-->>User: Password too weak
             else Password strong
-                Domain-->>Command: Password valid
-                Command->>Domain: Hash New Password (bcrypt)
-                Command->>UserRepo: Update password hash
-                UserRepo->>DB: Update password_hash
+                %% Hash new password
+                Command->>Command: hashPassword(newPassword)
+                Command->>Command: bcrypt.hash(newPassword, saltRounds=12)
+
+                %% Update password
+                Command->>UserRepo: changePassword(userId, newPasswordHash)
+                UserRepo->>DB: UPDATE users SET password_hash = ? WHERE id = ?
                 DB-->>UserRepo: Password updated
                 UserRepo-->>Command: Done
 
-                Command->>ResetTokenRepo: Mark token as used
-                ResetTokenRepo->>DB: Set used_at
+                %% Mark token as used
+                Command->>ResetTokenRepo: markAsUsed(tokenId)
+                ResetTokenRepo->>DB: UPDATE password_reset_tokens SET used_at = NOW() WHERE id = ?
                 DB-->>ResetTokenRepo: Done
                 ResetTokenRepo-->>Command: Done
 
-                Command->>ResetTokenRepo: Invalidate all other tokens for user
-                ResetTokenRepo->>DB: Revoke remaining tokens
+                %% Invalidate all other tokens for this user
+                Command->>ResetTokenRepo: invalidateAllUserTokens(userId)
+                ResetTokenRepo->>DB: UPDATE password_reset_tokens SET revoked_at = NOW() WHERE user_id = ? AND id != ?
                 DB-->>ResetTokenRepo: Done
                 ResetTokenRepo-->>Command: Done
 
                 Command-->>API: ResetPasswordResult { success: true }
                 API-->>Frontend: Success
-                Frontend-->>User: Password changed
+                Frontend-->>User: Password changed successfully
             end
         end
     end

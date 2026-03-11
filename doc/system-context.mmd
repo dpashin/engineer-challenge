@@ -12,11 +12,28 @@ stateDiagram-v2
         state "Формы регистрации,\nавторизации и\nвосстановления пароля" as Forms
     }
 
-    %% Backend (Command + Query Side)
-    state "Backend\n(Command Side + Domain Model)" as Backend {
-        state "Command Side\n(команды: регистрация,\nавторизация, восстановление)" as CommandSide
+    %% Backend - Presentation Layer
+    state "Backend\n(Presentation Layer)" as Presentation {
+        state "GraphQL API\n(Apollo Server)" as GraphQL
+        state "Rate Limit Interceptor\n(decorator + interceptor)" as RateLimitInterceptor
+    }
+
+    %% Backend - Command Side
+    state "Backend\n(Command Side)" as CommandSide {
+        state "Command Handlers\n(Register, Login, Reset, etc.)" as Handlers
         state "Domain Model\n(бизнес-правила,\nинварианты, агрегаты)" as DomainModel
-        state "Rate Limit Service\n(sliding window log)" as RateLimit
+    }
+
+    %% Backend - Query Side
+    state "Backend\n(Query Side)" as QuerySide {
+        state "Query Handlers\n(GetUser, etc.)" as QueryHandlers
+    }
+
+    %% Backend - Infrastructure
+    state "Backend\n(Infrastructure Layer)" as Infrastructure {
+        state "Repositories\n(User, Token)" as Repositories
+        state "Services\n(Email, Token, Hasher)" as Services
+        state "Cron Service\n(cleanup expired tokens)" as CronService
     }
 
     %% PostgreSQL
@@ -27,13 +44,36 @@ stateDiagram-v2
     %% Redis
     state "Redis\n(sliding window log storage)" as Redis
 
-    %% Связи
+    %% SMTP
+    state "SMTP Server\n(Mailcatcher / Production)" as SMTP
+
+    %% Связи - User Flow
     User --> Frontend: "Вводит данные\n(логин, пароль, email)"
-    Frontend --> Backend
+    Frontend --> GraphQL: "GraphQL запросы/мутации"
 
-    CommandSide --> DomainModel: "Применяет\nбизнес-правила"
+    %% Связи - Rate Limiting
+    GraphQL --> RateLimitInterceptor: "Перехват запроса"
+    RateLimitInterceptor --> Redis: "Проверка лимитов\n(sliding window)"
+    Redis --> RateLimitInterceptor: "allowed/remaining\nretryAfter"
+    RateLimitInterceptor --> Handlers: "Если OK"
 
-    CommandSide --> Database: "Запись/чтение\n(пароли хешированы,\ntoken expiration)"
+    %% Связи - Command Flow
+    Handlers --> DomainModel: "Применяет\nбизнес-правила"
+    Handlers --> Repositories: "Запись/чтение данных"
+    Repositories --> Database: "SQL запросы"
+    Database --> Repositories: "Результат"
 
-    RateLimit --> Redis: "Проверка лимитов\n(sliding window)"
-    Redis --> RateLimit: "allowed/remaining\nretryAfter"
+    %% Связи - Services
+    Handlers --> Services: "Использует сервисы"
+    Services --> SMTP: "Отправка email\n(password reset)"
+
+    %% Связи - Query Flow
+    QuerySide --> QueryHandlers: "Обработка запросов"
+    QueryHandlers --> Repositories: "Чтение данных"
+    Repositories --> Database: "SQL запросы"
+
+    %% Связи - Cron
+    CronService --> Database: "Очистка устаревших\nтокенов (daily 3AM)"
+
+    %% Связи - Domain Model
+    DomainModel --> Repositories: "Проверка инвариантов"
