@@ -48,6 +48,7 @@ This service follows Domain-Driven Design (DDD) and Command Query Responsibility
    - 10-minute token expiration
    - Single-use tokens
    - Rate limiting (3 attempts per 30 minutes)
+   - Token sent via email (not returned in API response)
 
 ### Security
 
@@ -119,7 +120,6 @@ mutation Login($email: String!, $password: String!) {
 mutation RequestPasswordReset($email: String!) {
   requestPasswordReset(email: $email) {
     success
-    token
     error {
       code
       message
