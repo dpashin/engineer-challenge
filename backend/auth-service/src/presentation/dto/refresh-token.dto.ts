@@ -27,12 +27,7 @@ export class RefreshTokenResultType {
   @Field()
   success: boolean;
 
-  @Field(() => String, { nullable: true })
-  accessToken?: string;
-
-  @Field(() => String, { nullable: true })
-  refreshToken?: string;
-
+  // Токены передаются только через httpOnly cookies для безопасности
   @Field({ nullable: true })
   expiresIn?: number;
 

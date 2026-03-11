@@ -10,6 +10,7 @@ import { RefreshTokenRepository } from './repositories/refresh-token.repository'
 import { PasswordHasher } from './services/password-hasher.service';
 import { TokenService } from './services/token.service';
 import { EmailService } from './services/email.service';
+import { HealthService } from './services/health.service';
 import { CookieMiddleware } from './middleware/cookie.middleware';
 import { AccountLockoutService } from './services/account-lockout.service';
 import { AccountLockoutPolicyService } from '../domain/account-lockout-policy.service';
@@ -24,6 +25,7 @@ import { AccountLockoutPolicyService } from '../domain/account-lockout-policy.se
     PasswordHasher,
     TokenService,
     EmailService,
+    HealthService,
     CookieMiddleware,
     AccountLockoutService,
     AccountLockoutPolicyService,
@@ -36,6 +38,7 @@ import { AccountLockoutPolicyService } from '../domain/account-lockout-policy.se
     PasswordHasher,
     TokenService,
     EmailService,
+    HealthService,
     RateLimitModule,
     AccountLockoutService,
     AccountLockoutPolicyService,

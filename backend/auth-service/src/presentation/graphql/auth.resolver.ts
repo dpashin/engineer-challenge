@@ -37,18 +37,29 @@ import {
 } from '../dto/refresh-token.dto';
 import { RevokeTokensResultType } from '../dto/revoke-tokens.dto';
 import { GetUserResultType } from '../dto/get-user.dto';
+import { HealthCheckResultType } from '../dto/health.dto';
 import { RateLimit } from './rate-limit.decorator';
 import { RateLimitType } from '../../infrastructure/services/rate-limit';
+import { HealthService } from '../../infrastructure/services/health.service';
 
 @Resolver()
 export class AuthResolver {
   private readonly logger = new Logger(AuthResolver.name);
 
-  constructor(private readonly commandBus: CommandBus) { }
+  constructor(
+    private readonly commandBus: CommandBus,
+    private readonly healthService: HealthService,
+  ) { }
 
   @Query(() => String)
   health(): string {
     return 'ok';
+  }
+
+  @Query(() => HealthCheckResultType)
+  async healthCheck() {
+    this.logger.log('Health check requested');
+    return this.healthService.checkHealth();
   }
 
   @Mutation(() => RegisterResultType)
@@ -109,16 +120,18 @@ export class AuthResolver {
       };
     }
 
-    // Устанавливаем токены в httpOnly cookies
+    // Устанавливаем токены в httpOnly cookies (единственный способ передачи токенов)
     const res = context.res;
     if (res && res.setAuthCookies) {
       res.setAuthCookies(result.accessToken, result.refreshToken);
+      this.logger.log(`Tokens set in httpOnly cookies for user: ${result.accessToken ? 'user authenticated' : 'anonymous'}`);
+    } else {
+      this.logger.warn('Response object or setAuthCookies not available - cookies not set');
     }
 
+    // Возвращаем успех без токенов в теле ответа (токены только в cookies для безопасности)
     return {
       success: true,
-      accessToken: result.accessToken,
-      refreshToken: result.refreshToken,
       expiresIn: result.expiresIn,
     };
   }
@@ -224,16 +237,18 @@ export class AuthResolver {
       };
     }
 
-    // Устанавливаем новые токены в cookies
+    // Устанавливаем новые токены в httpOnly cookies (единственный способ передачи токенов)
     const res = context.res;
     if (res && res.setAuthCookies) {
       res.setAuthCookies(result.accessToken, result.refreshToken);
+      this.logger.log(`New tokens set in httpOnly cookies`);
+    } else {
+      this.logger.warn('Response object or setAuthCookies not available - cookies not set');
     }
 
+    // Возвращаем успех без токенов в теле ответа (токены только в cookies для безопасности)
     return {
       success: true,
-      accessToken: result.accessToken,
-      refreshToken: result.refreshToken,
       expiresIn: result.expiresIn,
     };
   }
