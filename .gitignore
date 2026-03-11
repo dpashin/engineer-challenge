@@ -2,6 +2,7 @@
 .vscode/settings.json
 
 backend/auth-service/dist
+backend/auth-service/coverage
 backend/auth-service/node_modules
 
 # Environment variables
