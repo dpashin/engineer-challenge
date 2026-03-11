@@ -83,11 +83,6 @@ PROGRESSIVE_DELAYS_ENABLED=true
 REDIS_URL=redis://localhost:6379
 ```
 
-**Database Migration:**
-```bash
-psql $DATABASE_URL < migrations/002_add_account_lockout_fields.sql
-```
-
 ## GraphQL API
 
 ### Mutations
