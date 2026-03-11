@@ -87,8 +87,9 @@ UI-дизайн (https://www.figma.com/design/31KetUbya482vMSGgyiNIf/Orbitto-%7C
 > см. [Быстрый старт](#быстрый-старт)
 - [x] архитектурная схема (можно Mermaid/PlantUML);
 > [здесь](#архитектура)
-- [ ] объяснение, где в решении DDD, CQRS и IaC;
-> [IaC](#infrastructure)
+- [x] объяснение, где в решении DDD, CQRS и IaC;
+  - [CQRS, DDD](./backend/auth-service/README.md#Architecture)
+  - [IaC](#infrastructure)
 - [x] ключевые компромиссы (trade-offs);
 - [x] что сделали бы следующим шагом в production-версии.
 > [здесь](#todo)

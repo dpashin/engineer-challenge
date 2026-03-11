@@ -9,10 +9,12 @@ This service follows Domain-Driven Design (DDD) and Command Query Responsibility
 ### Layers
 
 - **Domain** (`src/domain/`) - Enterprise logic, entities, and business rules
-  - `User` - User aggregate root
+  - `User` - User aggregate root with account lockout logic
+  - `RefreshToken` - Refresh token entity with revocation support
   - `PasswordResetToken` - Token entity with security policies
   - `PasswordPolicyService` - Password validation rules
   - `ResetTokenPolicyService` - Token expiration and rate limiting rules
+  - `AccountLockoutPolicyService` - Account lockout and progressive delay rules
 
 - **Application** (`src/application/`) - Use cases, commands, queries, and handlers
   - Commands: `RegisterCommand`, `LoginCommand`, `RequestPasswordResetCommand`, `ResetPasswordCommand`
@@ -198,11 +200,12 @@ npm run test:cov
 ```
 src/
 ├── domain/                    # Domain layer
-│   ├── user.entity.ts
+│   ├── user.entity.ts         # User aggregate root
+│   ├── refresh-token.entity.ts # Refresh token entity
 │   ├── password-reset-token.entity.ts
-│   ├── refresh-token.entity.ts
 │   ├── password-policy.service.ts
-│   └── reset-token-policy.service.ts
+│   ├── reset-token-policy.service.ts
+│   └── account-lockout-policy.service.ts
 ├── application/               # Application layer
 │   ├── commands/             # Command definitions
 │   ├── queries/              # Query definitions
@@ -210,6 +213,7 @@ src/
 ├── infrastructure/           # Infrastructure layer
 │   ├── database/
 │   ├── repositories/
+│   ├── redis/
 │   └── services/
 └── presentation/             # Presentation layer
     ├── graphql/
