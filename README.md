@@ -30,8 +30,10 @@ UI-дизайн (https://www.figma.com/design/31KetUbya482vMSGgyiNIf/Orbitto-%7C
 ## Обязательные требования
 
 1. Архитектура
-- [ ] Покажите доменную модель и границы контекстов.
-- [ ] Выделите command side и query side (даже если в упрощенном виде).
+- [x] Покажите доменную модель и границы контекстов.
+> [здесь](./backend/auth-service/README.md#)
+- [x] Выделите command side и query side (даже если в упрощенном виде).
+> [здесь](./backend/auth-service/README.md#)
 - [x] Опишите ключевые инварианты и бизнес-правила (например, правила reset-token, валидация пароля, ограничения на повторную отправку).
 > [здесь](#бизнес-правила-и-ключевые-инварианты) 
 
@@ -86,6 +88,7 @@ UI-дизайн (https://www.figma.com/design/31KetUbya482vMSGgyiNIf/Orbitto-%7C
 - [x] архитектурная схема (можно Mermaid/PlantUML);
 > [здесь](#архитектура)
 - [ ] объяснение, где в решении DDD, CQRS и IaC;
+> [IaC](#infrastructure)
 - [x] ключевые компромиссы (trade-offs);
 - [x] что сделали бы следующим шагом в production-версии.
 > [здесь](#todo)
@@ -366,7 +369,7 @@ Rate limiting реализован с использованием **Redis** и 
 - [ ] Настроить CSP (Content Security Policy) headers
 - [ ] Добавить метрики и трейсинг
 - [ ] еще раз прочекать twelve-factor, что-то оставалось
-- [x] Replay attack protection (token reuse detection)
+- [ ] частичное дублирование основного readme и в backend/auth-service
 - [ ] Посчитать покрытие юнит-тестами
 - [ ] Проверить, как бэк отдает health статус
 - [ ] hot rebuild для дев среды
