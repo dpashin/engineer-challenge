@@ -199,7 +199,7 @@ export class AuthResolver {
   @Mutation(() => RefreshTokenResultType)
   @RateLimit(RateLimitType.TOKEN_REFRESH, 'refreshToken')
   async refreshToken(
-    @Args('refreshToken', { nullable: true }) refreshToken: string | null,
+    @Args('refreshToken', { type: () => String, nullable: true }) refreshToken: string | null,
     @Context() context: any,
   ): Promise<RefreshTokenResultType> {
     this.logger.log(`Refresh token mutation called`);
@@ -255,8 +255,8 @@ export class AuthResolver {
 
   @Mutation(() => RevokeTokensResultType)
   async logout(
-    @Args('refreshToken', { nullable: true }) refreshToken: string | null,
-    @Args('userId', { nullable: true }) userId: string | null,
+    @Args('refreshToken', { type: () => String, nullable: true }) refreshToken: string | null,
+    @Args('userId', { type: () => String, nullable: true }) userId: string | null,
     @Context() context: any,
   ): Promise<RevokeTokensResultType> {
     this.logger.log(`Logout mutation called`);
