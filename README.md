@@ -248,6 +248,8 @@ docker-compose down
 docker build --target dev -t auth-service-dev ./backend/auth-service && docker run --rm auth-service-dev npm run test:dev
 ```
 
+См. также [Основные сценарии для ручного тестирования](./doc//manual-testing.md)
+
 ### Production Deployment
 
 Для production окружения используйте отдельный compose файл с hardened настройками:
@@ -345,14 +347,18 @@ Rate limiting реализован с использованием **Redis** и 
 
 см. [ADR](./doc/adr/0008-rate-limiting.md)
 
-- **LOGIN_BY_EMAIL** — ограничение неудачных попыток входа по email
-- **LOGIN_BY_IP** — ограничение по IP адресу
-- **REGISTER_BY_EMAIL** — ограничение регистраций по email
-- **REGISTER_BY_IP** — ограничение регистраций по IP
-- **PASSWORD_RESET_BY_EMAIL** — ограничение запросов сброса пароля
-- **PASSWORD_RESET_BY_IP** — ограничение по IP для сброса пароля
-- **TOKEN_REFRESH** — ограничение refresh token запросов
-- **API_GLOBAL** — глобальное ограничение API
+┌─────────────────────────┬──────────────┬────────┬──────────────────────────┐
+│ Тип                     │ Лимит        │ Окно   │ Описание                 │
+├─────────────────────────┼──────────────┼────────┼──────────────────────────┤
+│ LOGIN_BY_EMAIL          │ 3 попытки    │ 30 мин │ Попытки входа на аккаунт │
+│ LOGIN_BY_IP             │ 10 попыток   │ 15 мин │ Попытки входа с IP       │
+│ REGISTER_BY_EMAIL       │ 3 попытки    │ 1 час  │ Регистрации на email     │
+│ REGISTER_BY_IP          │ 5 попыток    │ 1 час  │ Регистрации с IP         │
+│ PASSWORD_RESET_BY_EMAIL │ 3 попытки    │ 30 мин │ Сброс пароля на email    │
+│ PASSWORD_RESET_BY_IP    │ 10 попыток   │ 15 мин │ Сброс пароля с IP        │
+│ TOKEN_REFRESH           │ 5 запросов   │ 1 мин  │ Обновление токена        │
+│ API_GLOBAL              │ 100 запросов │ 1 мин  │ Глобальный лимит API     │
+└─────────────────────────┴──────────────┴────────┴──────────────────────────┘
 
 ### Очистка устаревших данных
 
@@ -364,7 +370,9 @@ Rate limiting реализован с использованием **Redis** и 
 
 ## TODO
 
-- [ ] частичное дублирование основного readme и в backend/auth-service
+- [ ] частичное дублирование документации
+  - основной readme и в backend/auth-service
+  - frontend - GraphQL API
 - [ ] Terraform/Kubernetes manifests/Helm
 - [ ] красивые миграции в базе (dbmate?, ...)
 - [ ] Настроить CSP (Content Security Policy) headers
@@ -373,6 +381,5 @@ Rate limiting реализован с использованием **Redis** и 
 - [ ] еще раз прочекать twelve-factor, что-то оставалось
   - [ ] Переделать логи в json
 - [ ] Улучшить покрытие юнит-тестами
-- [ ] Проверить, как бэк отдает health статус
+- [ ] на форме регистрации после "An account with this email already exists." изменяем email, но ошибка не сбрасывается
 - [ ] hot rebuild для дев среды
-

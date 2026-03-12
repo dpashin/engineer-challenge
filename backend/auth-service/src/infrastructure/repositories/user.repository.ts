@@ -69,6 +69,34 @@ export class UserRepository {
     };
   }
 
+  async findWithFailedResetAttemptsById(userId: string): Promise<{
+    id: string;
+    email: string;
+    isActive: boolean;
+    createdAt: Date;
+    failedResetAttempts: number;
+  } | null> {
+    const rows = await this.db.query(
+      `SELECT id, email, is_active, created_at, failed_reset_attempts
+       FROM users
+       WHERE id = $1 AND deleted_at IS NULL`,
+      [userId],
+    );
+
+    if (rows.length === 0) {
+      return null;
+    }
+
+    const row = rows[0];
+    return {
+      id: row.id,
+      email: row.email,
+      isActive: row.is_active,
+      createdAt: row.created_at,
+      failedResetAttempts: row.failed_reset_attempts,
+    };
+  }
+
   async create(email: string, passwordHash: string): Promise<{ id: string; email: string }> {
     const rows = await this.db.query(
       `INSERT INTO users (email, password_hash)
@@ -124,6 +152,26 @@ export class UserRepository {
            last_failed_reset_at = NULL
        WHERE id = $1`,
       [userId],
+    );
+  }
+
+  async recordFailedReset(userId: string): Promise<void> {
+    await this.db.query(
+      `UPDATE users
+       SET failed_reset_attempts = failed_reset_attempts + 1,
+           last_failed_reset_at = NOW()
+       WHERE id = $1`,
+      [userId],
+    );
+  }
+
+  async blockResetRequests(userId: string, blockedUntil: Date): Promise<void> {
+    await this.db.query(
+      `UPDATE users
+       SET reset_request_blocked_until = $1,
+           updated_at = NOW()
+       WHERE id = $2`,
+      [blockedUntil, userId],
     );
   }
 
