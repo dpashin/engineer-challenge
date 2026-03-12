@@ -135,7 +135,7 @@ UI-дизайн (https://www.figma.com/design/31KetUbya482vMSGgyiNIf/Orbitto-%7C
 
 ---
 
-# Реализация
+# Реализация {#implementation}
 
 [Скринкаст с демонстрацией основных фич](https://disk.yandex.ru/i/8PDWo0wQYIJEDQ)
 
