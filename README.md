@@ -137,6 +137,8 @@ UI-дизайн (https://www.figma.com/design/31KetUbya482vMSGgyiNIf/Orbitto-%7C
 
 # Реализация
 
+[Скринкаст с демонстрацией основных фич](https://disk.yandex.ru/i/8PDWo0wQYIJEDQ)
+
 ## Архитектура
 
 [System context diagram](./doc/system-context.mmd)
@@ -387,4 +389,7 @@ Rate limiting реализован с использованием **Redis** и 
   - [ ] Переделать логи в json
 - [ ] Улучшить покрытие юнит-тестами
 - [ ] на форме регистрации после "An account with this email already exists." изменяем email, но ошибка не сбрасывается
+- [ ] Дублирование валидации пароля на фронте
 - [ ] hot rebuild для дев среды
+- [ ] Красивая верстка для письма с восстановлением пароля
+
