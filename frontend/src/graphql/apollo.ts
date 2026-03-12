@@ -77,10 +77,9 @@ async function handleTokenRefresh(
     const result = await response.json();
 
     if (result.data?.refreshToken?.success) {
-      const { accessToken, refreshToken: newRefreshToken } = result.data.refreshToken;
-
-      // Update tokens in store (access token для памяти, refresh в cookies)
-      authStore.updateTokens(accessToken, newRefreshToken);
+      // Токены установлены в httpOnly cookies на сервере
+      // Обновляем состояние хранилища (токены пустые, т.к. хранятся в cookies)
+      authStore.updateTokens('', '');
 
       // Retry the original operation with new token
       const newOperation = {

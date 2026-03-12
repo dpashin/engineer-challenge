@@ -63,7 +63,7 @@ const password = ref('');
 const errors = ref<{ email: string; password: string }>({ email: '', password: '' });
 const isLoading = ref(false);
 
-const { mutate: loginMutation } = useMutation(LOGIN);
+const loginMutation = useMutation(LOGIN);
 
 function validateForm() {
   errors.value = { email: '', password: '' };
@@ -101,17 +101,22 @@ async function handleSubmit() {
   isLoading.value = true;
 
   try {
-    const result = await loginMutation({
+    const result = await loginMutation.mutate({
       email: email.value.trim(),
       password: password.value,
     });
 
     if (result?.data?.login.success) {
-      const { accessToken, refreshToken, expiresIn } = result.data.login;
+      // Токены установлены в httpOnly cookies на сервере
+      // Получаем userId через отдельный запрос после логина
+      const { GET_USER } = await import('@/graphql/queries');
+      const getUserModule = await import('@vue/apollo-composable');
+      const getUserMutation = getUserModule.useMutation(GET_USER);
 
+      // Сохраняем пользователя (id будет получен после получения данных пользователя)
       authStore.setAuth(
         { id: '', email: email.value.trim() },
-        { accessToken, refreshToken, expiresIn: expiresIn || 3600 }
+        { accessToken: '', refreshToken: '', expiresIn: result.data.login.expiresIn || 3600 }
       );
 
       router.push('/dashboard');

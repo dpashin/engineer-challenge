@@ -18,8 +18,6 @@ export const LOGIN = gql`
   mutation Login($email: String!, $password: String!) {
     login(email: $email, password: $password) {
       success
-      accessToken
-      refreshToken
       expiresIn
       error {
         code
@@ -57,8 +55,6 @@ export const REFRESH_TOKEN = gql`
   mutation RefreshToken($refreshToken: String!) {
     refreshToken(refreshToken: $refreshToken) {
       success
-      accessToken
-      refreshToken
       expiresIn
       error {
         code
