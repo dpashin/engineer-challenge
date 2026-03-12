@@ -8,10 +8,13 @@ export class EmailService {
   private readonly transporter: nodemailer.Transporter;
   private readonly fromAddress: string;
 
+  private readonly frontendUrl: string;
+
   constructor(private readonly configService: ConfigService) {
     const host = this.configService.get<string>('SMTP_HOST', 'mailcatcher');
     const port = this.configService.get<number>('SMTP_PORT', 1025);
     this.fromAddress = this.configService.get<string>('SMTP_FROM', 'noreply@auth-service.local');
+    this.frontendUrl = this.configService.get<string>('FRONTEND_URL', 'http://localhost:4200');
 
     this.transporter = nodemailer.createTransport({
       host,
@@ -22,7 +25,7 @@ export class EmailService {
   }
 
   async sendPasswordResetEmail(to: string, token: string): Promise<void> {
-    const resetUrl = `http://localhost:4200/set-password?token=${token}`;
+    const resetUrl = `${this.frontendUrl}/set-password?token=${token}`;
 
     const mailOptions: nodemailer.SendMailOptions = {
       from: this.fromAddress,

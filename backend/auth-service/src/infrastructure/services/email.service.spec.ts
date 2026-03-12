@@ -49,6 +49,7 @@ describe('EmailService', () => {
         if (key === 'SMTP_HOST') return defaultValue;
         if (key === 'SMTP_PORT') return defaultValue;
         if (key === 'SMTP_FROM') return defaultValue;
+        if (key === 'FRONTEND_URL') return defaultValue;
         return defaultValue;
       });
 
@@ -67,6 +68,7 @@ describe('EmailService', () => {
         if (key === 'SMTP_HOST') return 'smtp.example.com';
         if (key === 'SMTP_PORT') return 587;
         if (key === 'SMTP_FROM') return defaultValue;
+        if (key === 'FRONTEND_URL') return defaultValue;
         return defaultValue;
       });
 
@@ -85,6 +87,7 @@ describe('EmailService', () => {
         if (key === 'SMTP_HOST') return 'mailcatcher';
         if (key === 'SMTP_PORT') return 1025;
         if (key === 'SMTP_FROM') return 'custom@auth-service.local';
+        if (key === 'FRONTEND_URL') return defaultValue;
         return defaultValue;
       });
 
@@ -101,6 +104,7 @@ describe('EmailService', () => {
         if (key === 'SMTP_HOST') return 'mailcatcher';
         if (key === 'SMTP_PORT') return 1025;
         if (key === 'SMTP_FROM') return 'noreply@auth-service.local';
+        if (key === 'FRONTEND_URL') return 'http://localhost:4200';
         return defaultValue;
       });
 

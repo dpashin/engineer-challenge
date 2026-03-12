@@ -236,6 +236,11 @@ docker-compose ps
 - **PostgreSQL**: localhost:5432
 - **Redis**: localhost:6379
 
+**Конфигурация FRONTEND_URL:**
+- URL для сброса пароля конфигуруется через переменную `FRONTEND_URL` в `.env`
+- По умолчанию: `http://localhost:4200`
+- Для production: установите `FRONTEND_URL=https://yourdomain.com`
+
 ### Остановка приложения
 
 ```bash
