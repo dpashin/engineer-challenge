@@ -115,9 +115,9 @@ sequenceDiagram
                         DB-->>RefreshTokenRepo: Stored
                         RefreshTokenRepo-->>Command: Done
 
-                        Command-->>API: LoginResult { accessToken, refreshToken, expiresIn }
+                        Command-->>API: LoginResult { success, expiresIn }
                         API->>API: Set httpOnly cookies (accessToken, refreshToken)
-                        API-->>Frontend: Success + JWT tokens (for backward compatibility)
+                        API-->>Frontend: Success (tokens in httpOnly cookies only)
                         Frontend-->>User: Login successful
                     end
                 end

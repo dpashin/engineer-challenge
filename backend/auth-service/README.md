@@ -106,8 +106,6 @@ mutation Register($email: String!, $password: String!) {
 mutation Login($email: String!, $password: String!) {
   login(email: $email, password: $password) {
     success
-    accessToken
-    refreshToken
     expiresIn
     error {
       code
@@ -115,6 +113,9 @@ mutation Login($email: String!, $password: String!) {
     }
   }
 }
+```
+
+> **Примечание:** Токены (`accessToken` и `refreshToken`) передаются только через httpOnly cookies для безопасности и не возвращаются в теле GraphQL-ответа.
 
 # Request password reset
 mutation RequestPasswordReset($email: String!) {
